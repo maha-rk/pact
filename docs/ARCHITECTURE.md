@@ -1,11 +1,12 @@
 # Pact — Architecture
 
-Four diagrams, each answering a different question, rather than one dense
+Five diagrams, each answering a different question, rather than one dense
 diagram trying to answer all of them at once: a system overview (what is
 this, at a glance), the agent orchestration detail (how the six agents
 relate), a negotiation sequence (what actually happens, in order, during a
-live run), and the data/infrastructure layer (what's real, and where it
-lives).
+live run), the data/infrastructure layer (what's real, and where it
+lives), and the evaluation harness pipeline (how a claim like "Pact saves
+money" becomes a provable, re-runnable result).
 
 ---
 
@@ -159,6 +160,32 @@ and unnecessary. Gemini is reserved for the actual deep reasoning: parsing
 an ambiguous requirement, or narrating *why* a negotiation move was made in
 plain language. This is a real model-selection decision, not two models
 doing the same thing for stack-padding.
+
+---
+
+## 5. Evaluation Harness Pipeline
+
+The path from "Pact saves money" as a claim to "Pact saves money" as a
+provable, re-runnable result — the piece that turns the evaluation
+harness (PRD §29) into something with real architectural weight, not just
+a paragraph of intent.
+
+```mermaid
+flowchart LR
+    CATALOGUE["Scenario Catalogue<br/>(PRD §18)<br/>fixed set of representative<br/>negotiation scenarios"] --> RUN["Full agent pipeline<br/>run once per scenario,<br/>end to end"]
+    RUN --> LOG["Negotiation log<br/>offers, verification results,<br/>compliance results, outcome"]
+    LOG --> BQ["BigQuery<br/>every run's full log,<br/>demo and background runs alike"]
+    BQ --> AGG["Aggregate query<br/>agreement rate, avg rounds,<br/>avg savings %, compliance<br/>catches — computed via SQL"]
+    AGG --> REPORT["Evaluation report<br/>real numbers from real runs,<br/>included in the submission"]
+```
+
+**Why this matters**: every number in the evaluation report traces back
+through this exact pipeline to a real, individually-logged negotiation run
+— there is no manual computation, no hand-picked scenario, and no step
+where a plausible-looking number could be substituted for a real one. The
+same BigQuery table backs both a single demo run's replay (§3, FR-10) and
+the full aggregate statistics — one real record, queried two different
+ways, not two separately maintained sources of truth.
 
 ---
 
