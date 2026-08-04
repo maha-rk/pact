@@ -64,7 +64,8 @@ and reports whatever it got.
 ## 3. Negotiation Sequence (a real run, in order)
 
 This is what actually happens, step by step, during one live negotiation —
-including the two "wow" moments: a caught lie, and a rejected deal.
+including the two "wow" moments: a negotiating claim that fails
+verification, and a rejected deal.
 
 ```mermaid
 sequenceDiagram
@@ -97,8 +98,8 @@ sequenceDiagram
         GCP-->>N: counter-offer
     end
 
-    N->>V: verify AWS's counter-offer claim
-    V-->>N: mismatch vs. real public pricing API
+    N->>V: verify AWS's claimed committed-use discount rate
+    V-->>N: rate doesn't match AWS's live published pricing tiers
     N->>AWS: challenge, renegotiate
     AWS-->>N: revised, verified offer
 
