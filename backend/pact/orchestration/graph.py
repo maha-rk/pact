@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 
+from pact.a2a.vendor_client import HttpVendorClient, VendorUnavailableError
 from pact.agents import compliance_agent, decision_agent, discovery_agent, verification_agent
 from pact.agents.negotiation_agent import buyer_offer_at_round, vendor_offer_at_round
 from pact.mcp_tools.pricing_tool import PricingSource
@@ -33,7 +34,15 @@ def run_negotiation(
     pricing_source: PricingSource,
     initial_claimed_discounts: dict[VendorId, float],
     max_rounds: int = DEFAULT_MAX_ROUNDS,
+    vendor_client: HttpVendorClient | None = None,
 ) -> NegotiationState:
+    """If `vendor_client` is provided, each round's vendor offer is
+    fetched over real HTTP from that vendor's genuinely separate service
+    (PRD §17) -- the negotiation actually happens across process/service
+    boundaries, not just in-process math. Without it (e.g. fast unit/e2e
+    tests against fixtures), offers are computed in-process using the same
+    deterministic function the vendor services call internally -- the math
+    is identical either way; only the transport differs."""
     state = NegotiationState(
         negotiation_id=str(uuid.uuid4()),
         requirement=requirement,
@@ -78,14 +87,31 @@ def run_negotiation(
         round_price_acceptable: list[tuple[Offer, object]] = []  # (offer, verification)
 
         # --- Negotiation Agent: simultaneous offers to every active vendor (FR-3) ---
-        for vendor_id in state.active_vendors:
-            offer = vendor_offer_at_round(
-                vendor_id=vendor_id,
-                list_price=list_prices[vendor_id],
-                claimed_discount_rate=current_claimed_discount[vendor_id],
-                round_number=round_number,
-                max_rounds=max_rounds,
-            )
+        for vendor_id in list(state.active_vendors):
+            if vendor_client is not None:
+                try:
+                    offer = vendor_client.negotiate(
+                        vendor_id=vendor_id,
+                        gpu_count=requirement.gpu_count,
+                        contract_months=requirement.contract_months,
+                        round_number=round_number,
+                        max_rounds=max_rounds,
+                        claimed_discount_rate=current_claimed_discount[vendor_id],
+                    )
+                except VendorUnavailableError as exc:
+                    # PRD §27: disclose, never substitute an invented price.
+                    state.active_vendors.remove(vendor_id)
+                    state.unavailable_vendors.append(vendor_id)
+                    state.log(EventType.VENDOR_UNAVAILABLE, vendor_id=vendor_id, detail=str(exc))
+                    continue
+            else:
+                offer = vendor_offer_at_round(
+                    vendor_id=vendor_id,
+                    list_price=list_prices[vendor_id],
+                    claimed_discount_rate=current_claimed_discount[vendor_id],
+                    round_number=round_number,
+                    max_rounds=max_rounds,
+                )
             state.offers.append(offer)
             state.log(
                 EventType.OFFER_MADE,
