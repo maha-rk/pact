@@ -8,7 +8,7 @@ from typing import Callable
 
 from pact.models.schemas import ComplianceResult, Decision, EvidenceItem, Offer, VerificationResult
 
-Narrator = Callable[[str, float, list[str]], str]
+Narrator = Callable[..., str]
 
 
 def build_decision(
@@ -74,6 +74,7 @@ def build_decision(
                 winning_offer.vendor_id.value.upper(),
                 winning_offer.price_usd,
                 [f"{e.label}: {e.value} (source: {e.source})" for e in evidence],
+                negotiation_id=negotiation_id,
             )
         except Exception as exc:
             narrator_error = str(exc)  # keep the deterministic fallback; never block on a narration failure

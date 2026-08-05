@@ -17,27 +17,26 @@ externally, what comes out.
 
 ```mermaid
 flowchart LR
-    USER["User<br/>voice or photo"] --> GUARDRAILS["Guardrails (text/voice only)<br/>prompt-injection classifier + Presidio PII<br/>real, self-hosted — PRD §23a"]
-    GUARDRAILS --> GATEWAY["API Gateway<br/>target design, not yet built — PRD §23a"]
+    USER["User<br/>voice or photo"] --> GUARDRAILS["Guardrails<br/>prompt-injection classifier + Presidio PII<br/>real, self-hosted — PRD §23a"]
+    GUARDRAILS --> GATEWAY["API Gateway<br/>real JWT auth + rate limiting<br/>(pact-core middleware) — PRD §23a"]
     GATEWAY --> ORCH["Pact<br/>Agent Orchestration<br/>(Google ADK)"]
     ORCH <-->|A2A Protocol<br/>live negotiation| VENDORS["Independent Vendor Agents<br/>AWS · Azure · GCP · RunPod"]
     ORCH --> DECISION["Final Decision<br/>Evidence + Reasoning<br/>no fabricated scores"]
     ORCH -.->|deployed on| INFRA["Cloud Run · BigQuery · Vertex AI"]
-
-    classDef planned stroke-dasharray: 5 5,fill:#fff3cd,stroke:#997404,color:#000
-    class GATEWAY planned
 ```
 
 **Read this as**: a user states a real requirement once. Everything else —
 finding vendors, negotiating with several of them at once, verifying their
 claims, enforcing policy, and deciding — happens autonomously inside Pact's
 agent orchestration layer, with A2A as the actual channel Pact uses to
-transact with vendors that are not part of the same system. The Guardrails
-node is real today (photo intake isn't screened by it — there's no OCR
-step producing text to check, so it stays bounded by the existing
-JSON-schema + human-review safety net); the dashed Gateway node is the
-one piece of this diagram that isn't running today — today's real access
-boundary is CORS restriction (PRD §26).
+transact with vendors that are not part of the same system. Both Guardrails
+and Gateway are real: photo intake is covered by a real transcription call
+that feeds the same text-based guardrail text/voice already use; the
+Gateway's JWT auth is real but off by default (`AUTH_REQUIRED=false`,
+since this build has no end-user accounts to protect yet), and its rate
+limiting is real and always on. Neither is a separate physical process —
+both are implemented as `pact-core` middleware, a disclosed choice at this
+single-operator scale (PRD §23a).
 
 ---
 
@@ -156,17 +155,14 @@ flowchart TB
         VERTEXAI["Vertex AI<br/>real, tested fallback only —<br/>not the default serving path"]
     end
 
-    OTEL["OpenTelemetry tracing<br/>token usage · latency · prompt hashes<br/>target design, not yet built — PRD §23b"]
+    OTEL["OpenTelemetry tracing<br/>real spans: token usage · latency ·<br/>prompt hashes · negotiation_id — PRD §23b"]
 
     GEMINI -.->|fallback only, on Developer API failure| VERTEXAI
     MCP -.->|used by Discovery,<br/>Negotiation, Verification agents| MODELS
     MODELS --> CLOUDRUN
     BIGQUERY --> CLOUDRUN
-    MODELS -.-> OTEL
-    OTEL -.-> BIGQUERY
-
-    classDef planned stroke-dasharray: 5 5,fill:#fff3cd,stroke:#997404,color:#000
-    class OTEL planned
+    MODELS --> OTEL
+    OTEL --> BIGQUERY
 ```
 
 **Why Gemini and Gemma are both here, doing different jobs**: Gemma runs
@@ -222,15 +218,25 @@ ways, not two separately maintained sources of truth.
   Negotiation Agent is willing to move off its opening offer over
   successive rounds, based on time/urgency and the vendor's own behavior.
   This is what keeps negotiation *real* math, not an LLM inventing numbers.
-- **API Gateway** (dashed nodes above) — the target single ingress point
-  for a multi-tenant production version (auth, rate limiting, TLS
-  termination); not yet built for this single-operator build (PRD §23a).
-- **Guardrails** (solid node above) — the real, self-hosted prompt-injection
-  classifier and Microsoft Presidio PII detector protecting FR-1's
-  text/voice intake, the one place raw user input reaches a model before
-  validation. A hosted alternative (Enkrypt AI) was evaluated and rejected
-  after real side-by-side testing showed this combination catching more
-  real attacks with no external dependency (PRD §23a).
+- **API Gateway** — real JWT authentication and rate limiting for
+  external-facing traffic, implemented directly as `pact-core`
+  middleware/dependencies rather than a separate physical gateway
+  process — a disclosed choice at this single-operator scale, not a gap.
+  Auth is real but off by default (no end-user accounts exist yet to
+  protect); rate limiting is real and always on. TLS termination is real
+  via the deployment layer (ngrok) (PRD §23a).
+- **Guardrails** — the real, self-hosted prompt-injection classifier and
+  Microsoft Presidio PII detector protecting FR-1's intake, the one place
+  raw user input reaches a model before validation — covering both
+  modalities (text/voice directly; photo via a real transcription call
+  feeding the same screen). A hosted alternative (Enkrypt AI) was
+  evaluated and rejected after real side-by-side testing showed this
+  combination catching more real attacks with no external dependency
+  (PRD §23a).
 - **CRISPE** — the prompt-structuring framework (Capacity/Role, Insight,
   Statement, Personality, Experiment) both of Pact's real Gemini prompts
   are documented against (PRD §16a).
+- **model_traces** — the real BigQuery table (`infra/bigquery/schema.sql`)
+  every OpenTelemetry span exports to: one row per real Gemini/Gemma/Vertex
+  call, with token usage, latency, a prompt hash, and (where available) a
+  correlating `negotiation_id` (PRD §23b).

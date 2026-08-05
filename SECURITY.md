@@ -8,10 +8,18 @@ rather than a public pull request describing the exploit.
 
 ## What this build actually does
 
-- **No payment or card information is required anywhere.** The
-  deployment path (Docker + ngrok — see the README's
-  [Deployment](README.md#deployment) section) was deliberately chosen
-  over billing-gated infrastructure for this reason.
+- **No payment or card information is required for the core system.**
+  The default configuration (Gemini Developer API + Docker/ngrok — see
+  the README's [Deployment](README.md#deployment) section) needs no card
+  anywhere. The *optional* Vertex AI fallback requires a billing-enabled
+  GCP project — Google's real $300/90-day free trial was used for this,
+  needing a card for identity verification only (a temporary hold, never
+  an actual charge unless someone manually upgrades to a paid account).
+- **Real JWT authentication** (`pact/api/gateway.py`), off by default
+  (`AUTH_REQUIRED=false` — no end-user accounts exist yet to protect),
+  but genuinely implemented and tested, not a placeholder.
+- **Real rate limiting**, always on: 20 requests/minute per client on
+  every negotiation-mutating endpoint.
 - **Vendor pricing data is public by construction** — both live pricing
   sources (AWS Price List Bulk API, Azure Retail Prices API) are public,
   keyless APIs; no private or credentialed vendor data is accessed.

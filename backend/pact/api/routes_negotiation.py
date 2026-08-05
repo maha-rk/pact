@@ -4,12 +4,13 @@ and render two projections of the same record."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 import os
 
 from pact.a2a.vendor_client import HttpVendorClient
+from pact.api.gateway import limiter, require_bearer_token
 from pact.logging import bigquery_sink
 from pact.models.schemas import AgentCard, PolicyConstraints, Requirement, VendorId
 from pact.orchestration import approval
@@ -96,8 +97,9 @@ def _plausibility_screener():
     return plausibility_screen
 
 
-@router.post("", response_model=NegotiationState)
-def create_negotiation(req: NegotiationRequest, background_tasks: BackgroundTasks) -> NegotiationState:
+@router.post("", response_model=NegotiationState, dependencies=[Depends(require_bearer_token)])
+@limiter.limit("20/minute")
+def create_negotiation(request: Request, req: NegotiationRequest, background_tasks: BackgroundTasks) -> NegotiationState:
     requirement = Requirement(
         gpu_type=req.gpu_type,
         gpu_count=req.gpu_count,
@@ -139,8 +141,11 @@ def get_negotiation(negotiation_id: str) -> NegotiationState:
     return state
 
 
-@router.post("/{negotiation_id}/approve", response_model=NegotiationState)
-def approve_negotiation(negotiation_id: str, req: ApprovalRequest, background_tasks: BackgroundTasks) -> NegotiationState:
+@router.post("/{negotiation_id}/approve", response_model=NegotiationState, dependencies=[Depends(require_bearer_token)])
+@limiter.limit("20/minute")
+def approve_negotiation(
+    request: Request, negotiation_id: str, req: ApprovalRequest, background_tasks: BackgroundTasks
+) -> NegotiationState:
     state = _STORE.get(negotiation_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Negotiation not found")

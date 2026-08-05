@@ -46,8 +46,13 @@ def generate_via_vertex(contents, config=None) -> str:
     """Raises on failure -- callers already have their own next-tier
     degradation behavior (a deterministic template, or a clean error) and
     should catch this exactly like any other failed attempt."""
-    resp = _get_vertex_client().models.generate_content(model=_VERTEX_MODEL, contents=contents, config=config)
-    text = (resp.text or "").strip()
-    if not text:
-        raise RuntimeError("Vertex AI returned an empty response")
-    return text
+    from pact.observability.tracing import traced_model_call
+
+    trace_text = contents if isinstance(contents, str) else "\n".join(c if isinstance(c, str) else "<image>" for c in contents)
+    with traced_model_call(span_name="vertex.generate", model=_VERTEX_MODEL, prompt_text=trace_text) as span:
+        resp = _get_vertex_client().models.generate_content(model=_VERTEX_MODEL, contents=contents, config=config)
+        span.record_response(resp)
+        text = (resp.text or "").strip()
+        if not text:
+            raise RuntimeError("Vertex AI returned an empty response")
+        return text

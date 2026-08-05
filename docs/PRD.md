@@ -637,39 +637,56 @@ data warehouse, all deployed on Cloud Run.
 
 ## 23a. Security & API Gateway Architecture
 
-Pact's current build is a single-operator system (one deployment, no
-multi-tenant customer accounts yet), so several of the controls below are
-documented as the target design for a production, multi-tenant version
-rather than something a single-operator demo needs today — each is
-labeled accordingly.
+The classic "API Gateway" concerns — authentication, rate limiting, TLS
+termination — are real and implemented directly as FastAPI
+dependencies/middleware in `pact-core` (`pact/api/gateway.py`), rather
+than as a separate physical gateway process. That is a deliberate,
+disclosed architectural choice at this single-operator scale (a
+dedicated gateway process would add real infrastructure for zero extra
+capability here) — not a substitute for the real thing.
 
-- **API Gateway** (target design): a single ingress point in front of
-  `pact-core` and the vendor services, terminating TLS and applying rate
-  limiting before a request reaches application code, rather than each
-  service handling this independently.
-- **Authentication** (target design): OAuth2/JWT-based authentication for
-  any future multi-tenant deployment. The current build has no end-user
-  accounts to authenticate — its access boundary today is CORS restricted
-  to the known local frontend origins, documented honestly as narrower
-  than production auth, not a placeholder pretending to be one.
-- **Rate limiting** (target design): per-client request limits at the
-  gateway, to bound both cost (external API calls) and abuse, once the
-  system is exposed beyond a single operator's own demo traffic.
-- **Encryption**: TLS in transit is already real for every external
-  call this build makes (AWS Price List Bulk API, Azure Retail Prices
-  API, Gemini API, BigQuery) — all are HTTPS-only endpoints. At-rest
-  encryption for BigQuery-stored negotiation logs relies on BigQuery's
-  own default encryption at rest; no additional application-level
-  encryption is implemented or claimed.
-- **LLM-specific guardrails — real, self-hosted**: FR-1's text/voice
-  requirement intake (`pact/models/requirement_parser.py`) is the one
-  place in the system where raw, unstructured user input reaches an LLM
-  before any deterministic validation — the natural target for prompt
-  injection and PII exposure. `pact/models/guardrail_client.py`
-  implements this for real: a fine-tuned `deberta-v3-base` prompt-injection
-  classifier (`protectai/deberta-v3-base-prompt-injection-v2`, via
-  `transformers`) and Microsoft Presidio for PII detection, both running
-  self-hosted with no external API, no rate limit, and no cost.
+- **Authentication — real, tested, off by default**: `pact/api/gateway.py`
+  implements real JWT issuance (`POST /auth/token`, exchanging a
+  pre-shared `PACT_API_KEY` for a signed, expiring bearer token) and
+  validation (a `require_bearer_token` dependency on every
+  negotiation-mutating endpoint: `POST /negotiations`,
+  `POST /negotiations/{id}/approve`, `POST /requirements/parse-image`,
+  `POST /requirements/parse-text`). Enforcement is gated by
+  `AUTH_REQUIRED` (default `false`) because this build has no end-user
+  accounts yet — gating the demo UI from itself wouldn't mean anything —
+  but the mechanism itself is real and proven:
+  `tests/integration/test_gateway.py` issues a real token, confirms a
+  request without one is rejected, and confirms a valid one passes.
+- **Rate limiting — real, always on**: the same module wires a real
+  `slowapi` limiter (20 requests/minute per client) onto those same four
+  endpoints, with no on/off flag, since it only ever engages under actual
+  abuse-level traffic and costs nothing at normal demo volume. Proven by
+  forcing a real 429 in an isolated test app with a tightened limit
+  (`test_gateway.py`).
+- **TLS termination**: real today via the deployment layer — ngrok
+  terminates TLS for the public HTTPS endpoint (see §Deployment in the
+  README) — not something `pact-core` needs to implement itself.
+- **Encryption**: TLS in transit is real for every external call this
+  build makes (AWS Price List Bulk API, Azure Retail Prices API, Gemini
+  API, BigQuery) — all HTTPS-only endpoints. At-rest encryption for
+  BigQuery-stored negotiation logs relies on BigQuery's own default
+  encryption at rest; no additional application-level encryption is
+  implemented or claimed.
+- **LLM-specific guardrails — real, self-hosted, covering both intake
+  modalities**: FR-1's requirement intake is the one place in the system
+  where raw, unstructured user input reaches an LLM before any
+  deterministic validation — the natural target for prompt injection and
+  PII exposure. `pact/models/guardrail_client.py` implements this for
+  real: a fine-tuned `deberta-v3-base` prompt-injection classifier
+  (`protectai/deberta-v3-base-prompt-injection-v2`, via `transformers`)
+  and Microsoft Presidio for PII detection, both running self-hosted with
+  no external API, no rate limit, and no cost. The photo intake path is
+  covered too: `pact/models/requirement_parser.py`'s
+  `transcribe_image_text` makes a real, separate Gemini Vision call to
+  transcribe the image verbatim, and that transcript is screened by the
+  same guardrail before the structured extraction proceeds — closing
+  what was previously an honest, disclosed gap (no OCR step existed to
+  produce text for the photo path to screen).
 
   **Enkrypt AI was evaluated first and rejected based on real test
   results, not assumption**: its hosted guardrails API (free tier, no
@@ -685,36 +702,43 @@ labeled accordingly.
   Gemma's plausibility pre-screen (§16), this layer is independent and
   never authoritative: it surfaces warnings to the human reviewing the
   pre-filled form (reinforcing FR-1's human-in-the-loop design) and never
-  blocks the actual Gemini call. Findings are not currently written to
-  BigQuery — see §32.
+  blocks the actual Gemini call.
 
 ---
 
 ## 23b. LLM Observability & Tracing
 
-Every real Gemini/Gemma call in the system (`gemini_client.py`,
-`gemma_client.py`, `requirement_parser.py`) is already tagged in the
-negotiation event log with which agent invoked it, the round number where
-applicable, and the outcome (`narration_degraded` on failure,
-`plausibility_screened` per Gemma call) — this is real today, not
-aspirational. The target design extends this into full request-level
-tracing:
+Real OpenTelemetry request-level tracing, implemented in
+`pact/observability/tracing.py` and wired into every Gemini/Gemma/Vertex
+call site (`gemini_client.py`, `gemma_client.py`, `requirement_parser.py`,
+`vertex_fallback.py`). One real span per model call, with:
 
-- **Correlation IDs**: each model call tagged with the owning
-  `negotiation_id`, so every Gemini/Gemma invocation for a given run can
-  be reconstructed end to end.
-- **Per-call metrics**: token usage, latency, and model version logged
-  alongside the existing negotiation log in BigQuery, enabling the
-  evaluation harness (§29) to report on model cost/latency, not just
-  negotiation outcomes.
-- **Prompt hashes, not raw prompts**: a hash of the prompt template is
-  logged for reproducibility auditing, rather than the raw prompt text
-  itself — the raw text is either a fixed template (narration) or
-  user-supplied input (intake), and logging the latter verbatim would
-  conflict with §23a's PII handling.
+- **Correlation IDs**: a real OTel trace/span ID on every call, and a
+  `negotiation_id` attribute where one is available (the Decision Agent's
+  narration call — FR-1 intake happens before a negotiation exists, so it
+  has no negotiation to correlate to yet).
+- **Per-call metrics**: real token usage (read directly off Gemini's
+  `usage_metadata`, or Ollama's own `prompt_eval_count`/`eval_count`
+  fields for Gemma) and real latency (read directly off the span's own
+  start/end timestamps — no manual timing code).
+- **Prompt hashes, not raw prompts**: a SHA-256 hash of the prompt is a
+  span attribute, never the raw prompt text — the raw text is either a
+  fixed template (narration) or user-supplied input (intake), and logging
+  the latter verbatim would conflict with §23a's PII handling.
+- **Error capture**: a failed call (e.g., the Developer API's free-tier
+  quota, which this build has genuinely hit) records the real exception
+  on its span rather than silently vanishing.
 
-This section documents the design; full OpenTelemetry-style
-instrumentation is not yet implemented — see §32.
+Exports to two real destinations: the console (always, zero setup,
+verified by watching stdout during a live negotiation) and BigQuery's
+`model_traces` table (`infra/bigquery/schema.sql`; best-effort, mirroring
+`logging/bigquery_sink.py`'s never-raises discipline exactly). Verified
+with a live run: a real negotiation produced two real
+`gemini.narrate_reasoning` spans with `status_code: ERROR` (the
+Developer API's quota, exhausted from repeated testing) followed by one
+real, successful `vertex.generate` span — the entire fallback chain
+(§16, "Vertex AI real, tested fallback") visible end to end in the trace
+data itself, not asserted separately from it.
 
 ---
 
@@ -743,10 +767,9 @@ content is business pricing/requirement data, not personal data.
 
 ## 26. Security, Privacy and Compliance Boundaries
 
-See §23a for the API Gateway / authentication / LLM-guardrail
-architecture (target design plus current real boundary) and §23b for the
-LLM observability design this section's credential-handling claim below
-is scoped against.
+See §23a for the real API Gateway / authentication / LLM-guardrail
+architecture and §23b for the real LLM observability tracing this
+section's credential-handling claim below is scoped against.
 
 - Vendor pricing data consumed is public by construction (public pricing
   APIs); no private or credentialed vendor data is accessed.
@@ -862,13 +885,21 @@ is scoped against.
   Vendor Agents used in this build — they are independently implemented
   by the Pact team as separate A2A services wrapping each provider's real
   public pricing data (§17).
-- Does not claim the §23a/§23b security and observability architecture is
-  fully implemented — the API Gateway, OAuth2/JWT auth, rate limiting,
-  and full OpenTelemetry-style tracing are documented target designs for
-  a multi-tenant production version; today's real access boundary is
-  CORS restriction (§26), and today's real observability is the
-  event-level tagging already in the negotiation log, not full
-  request-level tracing.
+- Does not claim a separate, physical API Gateway process exists —
+  authentication and rate limiting (§23a) are real and tested, but
+  implemented directly as `pact-core` middleware/dependencies, a
+  deliberate choice at this single-operator scale rather than standing up
+  a dedicated gateway service for no added capability.
+- Does not claim authentication is enforced by default — `AUTH_REQUIRED`
+  defaults to `false` because this build has no end-user accounts to
+  protect yet; the mechanism itself is real and proven
+  (`tests/integration/test_gateway.py`), not a placeholder.
+- Does not claim the real OpenTelemetry tracing (§23b) is paired with a
+  dashboard, alerting, or a managed observability backend — spans export
+  to the console and to a real BigQuery table (`model_traces`); querying
+  and visualizing that table is not yet built, the same honest gap the
+  evaluation harness's own aggregate queries (§29) once had before they
+  were written.
 - Does not claim the guardrail layer (§23a) catches every possible
   prompt injection or PII pattern — it is tested and proven against the
   specific cases documented in §23a and `tests/integration/test_guardrail_client.py`,
@@ -945,18 +976,22 @@ throughout this document, consolidated in one place:
 - **CRISPE** — a prompt-structuring framework (Capacity/Role, Insight,
   Statement, Personality, Experiment) used to document Pact's real Gemini
   prompts (§16a) explicitly rather than leaving prompt design implicit.
-- **API Gateway** — a single ingress point for external-facing traffic
-  handling auth, rate limiting, and TLS termination; documented as target
-  design for a multi-tenant version (§23a), not yet built for this
-  single-operator demo.
+- **API Gateway** — the real authentication (JWT) and rate-limiting
+  concerns for external-facing traffic, implemented directly as
+  `pact-core` middleware/dependencies (§23a) rather than a separate
+  physical gateway process — a disclosed choice at this single-operator
+  scale, not a gap. TLS termination is real via the deployment layer
+  (ngrok).
 - **Guardrail layer** — the real, self-hosted prompt-injection classifier
   (`protectai/deberta-v3-base-prompt-injection-v2`) and Microsoft Presidio
-  PII detector protecting FR-1's LLM-facing intake path (§23a). A hosted
-  alternative (Enkrypt AI) was evaluated and rejected after real
-  side-by-side testing showed this self-hosted combination catching more
-  real attacks with no external dependency.
-- **OpenTelemetry** — an open observability standard referenced as the
-  target format for the request-level LLM tracing described in §23b.
+  PII detector protecting FR-1's intake path for both modalities (§23a):
+  text/voice directly, and photo via a real transcription call that feeds
+  the same screen. A hosted alternative (Enkrypt AI) was evaluated and
+  rejected after real side-by-side testing showed this self-hosted
+  combination catching more real attacks with no external dependency.
+- **OpenTelemetry** — real request-level tracing (§23b) for every
+  Gemini/Gemma/Vertex call, exporting to the console and to BigQuery's
+  `model_traces` table; not yet paired with a dashboard or alerting.
 
 ---
 

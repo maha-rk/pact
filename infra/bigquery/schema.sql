@@ -28,3 +28,25 @@ CREATE TABLE IF NOT EXISTS `pact-hackathon.pact.negotiation_events` (
   detail STRING,
   timestamp TIMESTAMP NOT NULL
 );
+
+-- Real OpenTelemetry request-level tracing for every Gemini/Gemma call
+-- (PRD §23b). One row per span: never the raw prompt, only a hash of it
+-- (consistent with §23a's PII handling), plus real token usage and
+-- latency read directly off the span.
+CREATE TABLE IF NOT EXISTS `pact-hackathon.pact.model_traces` (
+  trace_id STRING NOT NULL,
+  span_id STRING NOT NULL,
+  span_name STRING NOT NULL,
+  negotiation_id STRING,
+  model STRING,
+  model_version STRING,
+  prompt_hash STRING,
+  prompt_length_chars INT64,
+  tokens_prompt INT64,
+  tokens_completion INT64,
+  tokens_total INT64,
+  latency_ms FLOAT64,
+  error BOOL,
+  error_message STRING,
+  start_time TIMESTAMP NOT NULL
+);

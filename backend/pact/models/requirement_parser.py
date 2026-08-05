@@ -61,8 +61,17 @@ def _get_client():
     return _client
 
 
+def _trace_text(contents: list) -> str:
+    """A stable text representation of a possibly-multimodal `contents`
+    list, for the tracing span's prompt hash -- image parts aren't text,
+    so they're represented by a fixed marker rather than their bytes."""
+    return "\n".join(c if isinstance(c, str) else "<image>" for c in contents)
+
+
 def _generate(contents: list) -> dict:
     from google.genai import types
+
+    from pact.observability.tracing import traced_model_call
 
     config = types.GenerateContentConfig(
         response_mime_type="application/json",
@@ -71,11 +80,15 @@ def _generate(contents: list) -> dict:
     last_error: Exception | None = None
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            resp = _get_client().models.generate_content(model=_MODEL, contents=contents, config=config)
-            text = (resp.text or "").strip()
-            if not text:
-                raise RuntimeError("Gemini returned an empty response")
-            return json.loads(text)
+            with traced_model_call(
+                span_name="gemini.parse_requirement", model=_MODEL, prompt_text=_trace_text(contents)
+            ) as span:
+                resp = _get_client().models.generate_content(model=_MODEL, contents=contents, config=config)
+                span.record_response(resp)
+                text = (resp.text or "").strip()
+                if not text:
+                    raise RuntimeError("Gemini returned an empty response")
+                return json.loads(text)
         except Exception as exc:
             last_error = exc
             if attempt < _MAX_ATTEMPTS:
@@ -86,6 +99,49 @@ def _generate(contents: list) -> dict:
     if vertex_configured():
         try:
             return json.loads(generate_via_vertex(contents, config=config))
+        except Exception:
+            pass  # Vertex AI fallback also failed -- raise the original Developer API error below
+
+    raise last_error  # type: ignore[misc]
+
+
+def transcribe_image_text(image_bytes: bytes, mime_type: str) -> str:
+    """Verbatim text transcription of a photographed document, used only
+    to run the same text-based guardrail screen (PRD §23a) over photo
+    intake that already runs over text/voice intake -- closes the gap
+    where photo input previously bypassed the Guardrails layer entirely
+    (there was no text to screen). A separate, plain-text Gemini call
+    from the structured extraction below; its own failure never blocks
+    that extraction (caught by the caller)."""
+    from google.genai import types
+
+    from pact.observability.tracing import traced_model_call
+
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+    instruction = (
+        "Transcribe ALL visible text in this image verbatim, exactly as written. "
+        "Do not summarize, interpret, or omit anything. If there is no legible "
+        "text, return an empty string."
+    )
+    contents = [instruction, image_part]
+
+    last_error: Exception | None = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            with traced_model_call(span_name="gemini.transcribe_image", model=_MODEL, prompt_text=instruction) as span:
+                resp = _get_client().models.generate_content(model=_MODEL, contents=contents)
+                span.record_response(resp)
+                return (resp.text or "").strip()
+        except Exception as exc:
+            last_error = exc
+            if attempt < _MAX_ATTEMPTS:
+                time.sleep(_RETRY_DELAY_SECONDS)
+
+    from pact.models.vertex_fallback import generate_via_vertex, vertex_configured
+
+    if vertex_configured():
+        try:
+            return generate_via_vertex(contents)
         except Exception:
             pass  # Vertex AI fallback also failed -- raise the original Developer API error below
 

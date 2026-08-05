@@ -30,13 +30,21 @@ def plausibility_screen(vendor_id: str, claimed_discount_rate: float, contract_m
         "suspiciously high for a commitment this short? Answer with one "
         "word (PLAUSIBLE or SUSPICIOUS), a colon, then a one-sentence reason."
     )
-    resp = httpx.post(
-        OLLAMA_URL,
-        json={"model": MODEL, "prompt": prompt, "stream": False},
-        timeout=TIMEOUT_SECONDS,
-    )
-    resp.raise_for_status()
-    text = (resp.json().get("response") or "").strip()
-    if not text:
-        raise RuntimeError("Gemma returned an empty response")
-    return text
+    from pact.observability.tracing import traced_model_call
+
+    with traced_model_call(span_name="gemma.plausibility_screen", model=MODEL, prompt_text=prompt) as span:
+        resp = httpx.post(
+            OLLAMA_URL,
+            json={"model": MODEL, "prompt": prompt, "stream": False},
+            timeout=TIMEOUT_SECONDS,
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        if body.get("prompt_eval_count") is not None:
+            span.set_attribute("tokens.prompt", body["prompt_eval_count"])
+        if body.get("eval_count") is not None:
+            span.set_attribute("tokens.completion", body["eval_count"])
+        text = (body.get("response") or "").strip()
+        if not text:
+            raise RuntimeError("Gemma returned an empty response")
+        return text

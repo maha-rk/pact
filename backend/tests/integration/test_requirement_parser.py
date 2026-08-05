@@ -13,7 +13,8 @@ import os
 import pytest
 from PIL import Image, ImageDraw
 
-from pact.models.requirement_parser import parse_requirement_from_image, parse_requirement_from_text
+from pact.models.guardrail_client import screen_text_input
+from pact.models.requirement_parser import parse_requirement_from_image, parse_requirement_from_text, transcribe_image_text
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("GEMINI_API_KEY"),
@@ -54,3 +55,27 @@ def test_parse_from_text_omits_fields_not_present():
     assert result["gpu_count"] == 4
     assert result["contract_months"] == 6
     assert result["budget_ceiling_usd"] is None
+
+
+def test_photo_intake_transcription_reaches_the_same_guardrail_as_text():
+    """Closes the gap where photo intake bypassed the Guardrails layer
+    entirely: renders a real PNG with a name/email/phone embedded (the
+    same PII the guardrail already catches on the text path), transcribes
+    it for real via Gemini Vision, and confirms the transcription is real
+    enough to trigger the same warning."""
+    image_bytes = _render_invoice_png(
+        [
+            "GPU Compute Quote",
+            "Prepared for: John Smith",
+            "john.smith@acmecorp.com",
+            "Phone: 555-123-4567",
+            "Spec: 8x H100 GPUs, 3-month contract",
+        ]
+    )
+    transcript = transcribe_image_text(image_bytes, "image/png")
+    assert "john.smith@acmecorp.com" in transcript
+
+    warnings = screen_text_input(transcript)
+    pii_warning = next((w for w in warnings if "personal data" in w.lower()), None)
+    assert pii_warning is not None
+    assert "EMAIL_ADDRESS" in pii_warning

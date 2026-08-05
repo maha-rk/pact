@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-48-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-56-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
@@ -186,10 +186,12 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 | Tool protocol | Model Context Protocol (official `mcp` SDK) | `pricing_lookup` / `verify_claim` exposed as real MCP tools over stdio |
 | Vendor transport | Real HTTP between genuinely separate vendor services | A2A-inspired; the literal `a2a-sdk` was evaluated and is disclosed as not used — see [Current status](#current-status--honest-scope) |
 | Verification data | AWS Price List Bulk API, Azure Retail Prices API | Live, public, keyless — the independent ground truth every claim is checked against |
-| Reasoning & intake | Gemini (`gemini-flash-latest`) | Decision narration and photo/voice requirement extraction — never the price |
+| Reasoning & intake | Gemini (`gemini-flash-latest`), Vertex AI (`gemini-2.5-flash`) as a real, tested fallback | Decision narration and photo/voice requirement extraction — never the price |
 | Plausibility pre-screen | Gemma 3 4B, self-hosted via Ollama | Independent, fast pre-screen — never authoritative over the deterministic verdict |
-| Intake guardrails | `protectai/deberta-v3-base-prompt-injection-v2` + Microsoft Presidio, both self-hosted | Prompt-injection and PII detection on FR-1's text/voice intake — no external API, no cost |
-| Persistence & analytics | Google BigQuery | Negotiation logs and evaluation-harness aggregate statistics |
+| Intake guardrails | `protectai/deberta-v3-base-prompt-injection-v2` + Microsoft Presidio, both self-hosted | Prompt-injection and PII detection on both FR-1 modalities (text/voice directly; photo via a real transcription call) — no external API, no cost |
+| API Gateway | Real JWT auth (`pyjwt`) + rate limiting (`slowapi`), as `pact-core` middleware | Auth off by default, rate limiting always on — see [Security](#security) |
+| Observability | Real OpenTelemetry spans, exported to console + BigQuery | Token usage, latency, prompt hashes, and `negotiation_id` correlation on every model call |
+| Persistence & analytics | Google BigQuery | Negotiation logs, evaluation-harness statistics, and model traces |
 | Deployment | Docker (single container) + ngrok | Cardless public URL — see [Deployment](#deployment) |
 
 ---
@@ -375,9 +377,22 @@ python -m pact.mcp_tools.server   # speaks real MCP over stdio; connect any MCP 
 
 Full policy: [SECURITY.md](SECURITY.md).
 
-- **No payment or card information is required anywhere.** The
-  deployment path (Docker + ngrok, see [Deployment](#deployment)) was
-  deliberately chosen over billing-gated infrastructure for this reason.
+- **No payment or card information is required for the core system.**
+  The default configuration (Gemini Developer API + Docker/ngrok, see
+  [Deployment](#deployment)) needs no card anywhere. The *optional*
+  Vertex AI fallback (see [Tech stack](#tech-stack)) requires a
+  billing-enabled GCP project — Google's real $300/90-day free trial was
+  used for this, which needs a card for identity verification only (a
+  temporary hold, never an actual charge unless someone manually upgrades
+  to a paid account) — disclosed here since it's a real, if minor,
+  departure from the zero-card default.
+- **Real JWT authentication, off by default.** `pact/api/gateway.py`
+  implements real token issuance and validation, gated by
+  `AUTH_REQUIRED` (default `false` — this build has no end-user accounts
+  to protect yet). The mechanism itself is real and tested, not a
+  placeholder.
+- **Real rate limiting, always on.** 20 requests/minute per client on
+  every negotiation-mutating endpoint, via `slowapi`.
 - **Vendor pricing data is public by construction** — both live pricing
   sources are public, keyless APIs; no private or credentialed vendor
   data is accessed.
@@ -403,9 +418,9 @@ pytest tests/
 | Layer | Count | What it proves |
 |---|---|---|
 | Unit | 13 | Deterministic concession-curve math, compliance rule matching — no external calls |
-| Integration | 23 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection, a real Vertex AI fallback |
+| Integration | 31 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing |
 | E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
-| **Total** | **48** | |
+| **Total** | **56** | |
 
 None of the integration or e2e tests mock the external APIs — they hit
 real AWS, real Azure, and (when a key is configured) the real Gemini API,
@@ -445,11 +460,14 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | Real MCP server (`pricing_lookup` / `verify_claim` over stdio) | ✅ Implemented and tested |
 | Real Google ADK orchestration (`SequentialAgent` + `Runner`) | ✅ Implemented and tested |
 | Gemini Vision photo/voice requirement intake (FR-1) | ✅ Implemented and tested |
-| Self-hosted prompt-injection + PII guardrails on text/voice intake | ✅ Implemented and tested |
-| Vertex AI fallback for both Gemini call sites | ✅ Implemented and tested — real fallback, not the default path |
+| Self-hosted prompt-injection + PII guardrails on both intake modalities | ✅ Implemented and tested |
+| Vertex AI fallback for every Gemini call site | ✅ Implemented and tested — real fallback, not the default path |
+| Real API Gateway (JWT auth + rate limiting, as `pact-core` middleware) | ✅ Implemented and tested — auth off by default, rate limiting always on |
+| Real OpenTelemetry tracing (console + BigQuery `model_traces`) | ✅ Implemented and tested |
 | Gemini narration of individual negotiation moves, not just the final decision | 🔭 Designed, not yet connected |
 | GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
 | Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
+| Dashboard/alerting on top of the real trace data | 🔭 Raw table is real; visualization is not yet built |
 
 ## Honest Limitations
 
@@ -555,33 +573,73 @@ data. What's real right now:
   auto-submitted, preserving both the human-in-the-loop framing and the
   "no invented value" acceptance criterion.
 - **Intake guardrails — self-hosted, tested against a hosted alternative
-  before choosing** — `pact/models/guardrail_client.py` screens FR-1's
-  text/voice intake for prompt injection (`protectai/deberta-v3-base-prompt-injection-v2`
-  via `transformers`) and PII (Microsoft Presidio), both self-hosted with
-  no external API or cost. Enkrypt AI's hosted guardrails API was tried
+  before choosing, covering both FR-1 modalities** —
+  `pact/models/guardrail_client.py` screens intake for prompt injection
+  (`protectai/deberta-v3-base-prompt-injection-v2` via `transformers`)
+  and PII (Microsoft Presidio), both self-hosted with no external API or
+  cost. Text/voice intake is screened directly; photo intake is screened
+  too, via a real, separate Gemini Vision transcription call
+  (`transcribe_image_text`) that feeds the same screen — closing what was
+  originally a disclosed gap (no OCR step existed to produce text for the
+  photo path to screen). Enkrypt AI's hosted guardrails API was tried
   first (free tier, no card) and tested live against a crafted injection
   attempt and a realistic quote with a name/email/phone number — it
   missed the injection entirely and caught only the email. The same two
   cases against this self-hosted pair: the injection classifier scored
   the attempt 99.9% INJECTION, and Presidio caught all three PII
-  entities — see `tests/integration/test_guardrail_client.py`. Like
-  Gemma's plausibility pre-screen, this is independent and never
-  authoritative; findings surface as warnings in the UI next to the
-  pre-filled form, reinforcing the human review already required before
-  a negotiation starts, rather than blocking anything silently.
-- **Vertex AI — real, tested fallback, not the default path** —
-  `pact/models/vertex_fallback.py` wraps a real Vertex AI call
-  (`gemini-2.5-flash`, via Application Default Credentials against the
-  `pact-hackathon` GCP project), only attempted after the Developer
-  API's own retries are exhausted in both `gemini_client.py` and
-  `requirement_parser.py`. The Developer API (a flat API key, no billing
-  dependency) remains the default deliberately — this build has hit its
-  free-tier rate limit more than once during development, and the
-  fallback exists specifically to survive that, not to replace the
-  primary path. Verified for real: `tests/integration/test_vertex_fallback.py`
-  forces the Developer API call to fail (an intentionally invalid key)
-  and confirms Vertex AI genuinely serves the response — skips
-  gracefully (like Ollama/Gemma) if `GCP_PROJECT_ID` isn't configured.
+  entities — see `tests/integration/test_guardrail_client.py` and
+  `test_requirement_parser.py`'s photo-intake test. Like Gemma's
+  plausibility pre-screen, this is independent and never authoritative;
+  findings surface as warnings in the UI next to the pre-filled form,
+  reinforcing the human review already required before a negotiation
+  starts, rather than blocking anything silently.
+- **Vertex AI — real, tested fallback, not the default path, covering
+  every Gemini call site** — `pact/models/vertex_fallback.py` wraps a
+  real Vertex AI call (`gemini-2.5-flash`, via Application Default
+  Credentials against the `pact-hackathon` GCP project), only attempted
+  after the Developer API's own retries are exhausted in
+  `gemini_client.py`, `requirement_parser.py` (both the structured
+  extraction and the image transcription). The Developer API (a flat API
+  key, no billing dependency) remains the default deliberately — this
+  build has hit its free-tier rate limit repeatedly during development,
+  and the fallback exists specifically to survive that, not to replace
+  the primary path. Verified for real, twice: `test_vertex_fallback.py`
+  forces the Developer API call to fail with an intentionally invalid
+  key and confirms Vertex AI genuinely serves the response; separately, a
+  live server run produced two real `gemini.narrate_reasoning` spans with
+  `status_code: ERROR` (the Developer API's quota, genuinely exhausted)
+  followed by one real, successful `vertex.generate` span — the fallback
+  chain visible end to end in real trace data, not just asserted in a
+  test. Skips gracefully (like Ollama/Gemma) if `GCP_PROJECT_ID` isn't
+  configured.
+- **Real API Gateway — JWT auth + rate limiting, as `pact-core`
+  middleware, not a separate physical gateway process** —
+  `pact/api/gateway.py` implements real token issuance
+  (`POST /auth/token`) and validation (`require_bearer_token`, a
+  dependency on every negotiation-mutating endpoint), gated by
+  `AUTH_REQUIRED` (default `false` — this build has no end-user accounts
+  to protect yet, so gating the demo UI from itself wouldn't mean
+  anything; the mechanism itself is real and proven, not a placeholder).
+  Rate limiting (`slowapi`, 20 requests/minute per client) is real and
+  always on, since it only engages under actual abuse-level traffic.
+  Both proven in `tests/integration/test_gateway.py`: a real signed JWT
+  is issued and validated, a missing/invalid token is rejected when
+  enforcement is on, and a tightened test limit genuinely returns a real
+  429 once exceeded.
+- **Real OpenTelemetry tracing — every Gemini/Gemma/Vertex call, exported
+  to the console and to BigQuery** — `pact/observability/tracing.py`
+  wraps every model call site in a real span: real trace/span IDs, real
+  token usage (read directly off Gemini's `usage_metadata` or Ollama's
+  own `prompt_eval_count`/`eval_count`), real latency (read off the
+  span's own timestamps), a SHA-256 prompt hash (never the raw prompt,
+  consistent with the guardrail layer's PII handling), and a
+  `negotiation_id` attribute where one exists yet (the Decision Agent's
+  narration call; FR-1 intake happens before a negotiation exists).
+  Exports to the console always, and to a real BigQuery table
+  (`infra/bigquery/schema.sql`'s `model_traces`, created for real on the
+  `pact-hackathon` project) best-effort, mirroring `bigquery_sink.py`'s
+  never-raises discipline exactly. Proven in `tests/integration/test_tracing.py`
+  and by the same live server run described above.
 
 Not yet wired into the running system — see [Roadmap](#roadmap) below,
 and `docs/PRD.md` §11's Google Technology Stack table for the intended
@@ -598,6 +656,9 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 - [ ] Managed cloud hosting once a genuinely free, cardless option exists
       (Cloud Run and Hugging Face Spaces were both evaluated and ruled
       out for requiring billing — see [Deployment](#deployment))
+- [ ] A dashboard over the real `model_traces` BigQuery table — the data
+      is real and queryable today; a visualization layer on top of it
+      isn't built yet
 
 ```mermaid
 flowchart LR
