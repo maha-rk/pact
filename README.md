@@ -6,67 +6,133 @@
 ![Tests](https://img.shields.io/badge/tests-44-brightgreen)
 ![Built for](https://img.shields.io/badge/Built%20for-AI%20Agent%20Builder%20Series%202026-8A2BE2)
 
-**Pact is a trustworthy autonomous procurement system where organizational
-agents negotiate directly with other organizational agents, every claim is
+Autonomous B2B procurement negotiation, where organizational agents
+negotiate directly with other organizational agents, every claim is
 independently verified, every decision is auditable, and every
 recommendation is grounded in real evidence rather than a fabricated
-score.**
+score.
 
-A Buyer Agent negotiates simultaneously with independent Vendor Agents
-over real HTTP, verifies every vendor claim against real, live pricing
-data, enforces policy as a hard gate, and produces an evidence-backed
-decision — nothing is fabricated, and nothing is finalized without
-explicit human approval.
-
-Full product and architecture documentation: [`docs/PRD.md`](docs/PRD.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-## Why this exists
-
-Procurement teams with recurring vendor spend already run this process —
-manually. A human reads vendor quotes, tries to negotiate against several
-suppliers at once (in practice, rarely at the same time), and has no
-practical way to check whether a vendor's "discount" claim is real before
-signing. Tools like SAP Ariba and Coupa digitize the paperwork around that
-decision; a person still reads it and makes the call.
-
-Pact moves the negotiation and claim-verification steps themselves into
-an autonomous system — a human is retained only at the final approval
-boundary, not at every step in between. In its flagship scenario (8×
-H100 GPUs, 3-month contract, $115,000 budget), Pact negotiated with AWS
-and Azure simultaneously over real HTTP, caught AWS's claimed discount as
-fabricated against AWS's own real pricing data, rejected AWS's corrected
-offer anyway for exceeding budget, and closed a real, verified, compliant
-deal with Azure at **$39,246.20 — roughly 66% under the budget ceiling** —
-with every one of those numbers traceable to a live public pricing API,
-not invented. See [Evidence](#evidence-the-flagship-scenario) below.
-
-## Screenshots
+[Documentation](docs/PRD.md) · [Architecture](docs/ARCHITECTURE.md) · [Evidence](#evidence-the-flagship-scenario) · [Getting Started](#getting-started)
 
 <!-- TODO: add screenshots before submission -->
 <!-- Decision / Evidence / Reasoning view: ![Decision view](docs/screenshots/decision-view.png) -->
 <!-- Negotiation Replay timeline: ![Replay timeline](docs/screenshots/replay-timeline.png) -->
 
+## Table of Contents
+
+1. [About](#about)
+2. [What makes Pact different](#what-makes-pact-different)
+3. [Core capabilities](#core-capabilities)
+4. [Tech stack](#tech-stack)
+5. [Architecture](#architecture)
+6. [Evidence: the flagship scenario](#evidence-the-flagship-scenario)
+7. [Project structure](#project-structure)
+8. [Getting Started](#getting-started)
+9. [Configuration](#configuration)
+10. [Security](#security)
+11. [Testing](#testing)
+12. [Evaluation harness](#evaluation-harness)
+13. [Deployment](#deployment)
+14. [Current status / honest scope](#current-status--honest-scope)
+15. [Roadmap](#roadmap)
+16. [Contributing](#contributing)
+17. [License](#license)
+18. [Acknowledgements](#acknowledgements)
+19. [Author](#author)
+
+## About
+
+Procurement teams with recurring vendor spend already run a version of
+this process today — manually. A person reads each vendor's quote, tries
+to negotiate against several suppliers at once (in practice, rarely at
+the same time), and has no practical way to confirm a vendor's claimed
+discount is real before signing. Existing procurement software mostly
+digitizes the paperwork around that decision — tracking quotes, routing
+approvals — without changing who actually negotiates or verifies
+anything. A human still reads it and makes the call.
+
+Pact moves the negotiation and claim-verification steps themselves into
+an autonomous system. A Buyer Agent negotiates simultaneously with
+independent Vendor Agents over real HTTP, an independent Verification
+Agent checks every vendor claim against a live external data source
+before it can affect the outcome, and a Compliance Agent enforces policy
+as a hard gate that can override even the cheapest offer. A human is
+retained only at the final approval boundary — not at every step in
+between.
+
+In its flagship scenario (8× H100 GPUs, 3-month contract, $115,000
+budget), Pact negotiated with two real cloud vendors simultaneously,
+caught a vendor's claimed discount as fabricated against that vendor's
+own real pricing data, rejected that vendor's corrected offer anyway for
+exceeding budget, and closed a real, verified, compliant deal at
+**$39,246.20 — roughly 66% under the budget ceiling** — with every one
+of those numbers traceable to a live public pricing API, not invented.
+See [Evidence](#evidence-the-flagship-scenario) below.
+
+### Key highlights
+
+- **Autonomous negotiation, not negotiation assistance.** The agents do
+  the negotiating, verifying, and evaluating; a human only approves the
+  final result.
+- **Nothing is trusted, everything is checked.** A vendor's claimed
+  discount is treated as a negotiating position, not a fact, until an
+  independent source confirms it.
+- **Policy is a hard gate, not a suggestion.** A deal that violates
+  budget, blocked-vendor, or certification policy is rejected — even if
+  it's the cheapest offer on the table — and the negotiation continues.
+
 ## What makes Pact different
 
 1. **Agents negotiate with agents, over a real transport.** The Buyer
    Agent and each Vendor Agent are genuinely separate HTTP services, not
-   one application pretending to be several.
-2. **Vendor claims are never trusted at face value.** Every claim is
-   independently checked against a real, live external source before it
-   can affect the outcome — a mismatch triggers renegotiation, not a
-   silently accepted number.
+   one application internally pretending to be several.
+2. **Claims are verified, not just displayed.** Existing procurement
+   tools show you whatever a vendor typed into a quote. Pact checks it
+   against a live, independent pricing source before it can influence
+   anything — a mismatch triggers renegotiation, not a silently accepted
+   number.
 3. **Policy can override price.** Even the cheapest verified offer is
    rejected if it violates an explicit constraint (budget, blocked
    vendor, missing certification), forcing renegotiation.
 4. **Every recommendation carries evidence, never a bare score.** The
    final output is always Decision + Evidence + Reasoning, with each
-   evidence item traceable to a real source.
-5. **Pact measures itself with real numbers.** The evaluation harness
-   runs a real scenario catalogue through the same pipeline as a live
-   negotiation and computes real aggregate statistics via SQL — no
-   claimed savings figure that isn't backed by a logged, re-runnable run.
+   evidence item traceable to a real source — not a confidence
+   percentage with nothing behind it.
+5. **Pact measures itself with real numbers.** Where most tools would
+   assert a savings percentage, Pact's evaluation harness runs a real
+   scenario catalogue through the same pipeline as a live negotiation and
+   computes aggregate statistics via SQL against actually-logged runs.
 
-## How it works
+## Core capabilities
+
+| Capability | What it does |
+|---|---|
+| Simultaneous multi-vendor negotiation | Negotiates with every discovered vendor at once over real HTTP, not sequentially |
+| Independent claim verification | Every vendor claim is checked against a live external pricing source before it can affect the outcome |
+| Policy enforcement | Budget ceilings, blocked vendors, and required certifications are hard gates a deal must pass |
+| Evidence-backed decisions | Every recommendation ships as Decision + Evidence + Reasoning, each evidence item traceable to a real source |
+| Human approval gate | No deal is ever finalized without an explicit, recorded approval action |
+| Full negotiation replay | Every offer, verification check, compliance check, and renegotiation is a timestamped, reviewable timeline |
+| Real evaluation harness | Runs a scenario catalogue through the live pipeline and computes real aggregate statistics via SQL |
+| Photo/voice requirement intake | Extracts requirement fields from a photographed quote or a spoken transcript, never inventing a missing value |
+
+## Tech stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Backend | Python 3.11+ / FastAPI | pact-core API, agent orchestration |
+| Frontend | React + TypeScript / Vite | Decision view, Replay timeline, requirement intake UI |
+| Negotiation core | Pure Python, deterministic concession curve | Reservation price / BATNA / time-decay logic — no LLM ever sets a price |
+| Agent orchestration | Google ADK (`SequentialAgent` + `Runner`) | Real orchestration of the Discovery and Negotiation/Verification/Compliance/Decision phases |
+| Tool protocol | Model Context Protocol (official `mcp` SDK) | `pricing_lookup` / `verify_claim` exposed as real MCP tools over stdio |
+| Vendor transport | Real HTTP between genuinely separate vendor services | A2A-inspired; the literal `a2a-sdk` was evaluated and is disclosed as not used — see [Current status](#current-status--honest-scope) |
+| Verification data | AWS Price List Bulk API, Azure Retail Prices API | Live, public, keyless — the independent ground truth every claim is checked against |
+| Reasoning & intake | Gemini (`gemini-flash-latest`) | Decision narration and photo/voice requirement extraction — never the price |
+| Plausibility pre-screen | Gemma 3 4B, self-hosted via Ollama | Independent, fast pre-screen — never authoritative over the deterministic verdict |
+| Persistence & analytics | Google BigQuery | Negotiation logs and evaluation-harness aggregate statistics |
+| Deployment | Docker (single container) + ngrok | Cardless public URL — see [Deployment](#deployment) |
+
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -125,7 +191,7 @@ sequenceDiagram
 Every figure below is fetched live from a public pricing API or computed
 directly from it — reproduce it yourself with
 `python scripts/run_scenario.py --fixture flagship --approve` (see
-[Running it](#running-it)).
+[Getting Started](#getting-started)).
 
 **Claim verification**
 
@@ -143,19 +209,7 @@ directly from it — reproduce it yourself with
 | Within $115,000 budget | ❌ | ✅ |
 | Outcome | Rejected on compliance grounds | Selected, pending human approval |
 
-## Contents
-
-- [Repository layout](#repository-layout)
-- [Prerequisites](#prerequisites)
-- [Setup](#setup)
-- [Running it](#running-it)
-- [Tests](#tests)
-- [Evaluation harness](#evaluation-harness)
-- [Current status / honest scope](#current-status--honest-scope)
-- [Deployment](#deployment)
-- [License](#license)
-
-## Repository layout
+## Project structure
 
 ```
 docs/                   PRD and architecture documentation
@@ -166,7 +220,7 @@ backend/
     orchestration/        The pipeline (graph.py), state/event log, human approval gate
     mcp_tools/            pricing_lookup / verify_claim: core logic + a real MCP server exposing both as MCP tools
     adk/                   Real Google ADK orchestration of the pipeline (SequentialAgent + Runner)
-    a2a/                  HTTP-based vendor transport (see note below)
+    a2a/                  HTTP-based vendor transport (see Tech stack)
     models/               Shared data schemas + Gemini Vision requirement parser
     api/                  FastAPI routes (pact-core)
     main.py               pact-core entrypoint
@@ -181,15 +235,20 @@ frontend/                 Vite + React + TypeScript UI (Decision view, Replay ti
 infra/                    bigquery/ (schema + aggregate query), huggingface/ (deployment container)
 ```
 
-## Prerequisites
+## Getting Started
+
+### Prerequisites
 
 - Python 3.11+
 - Node 18+
-- [Ollama](https://ollama.com) running the `gemma3:4b` model — optional; without it, verification still runs correctly (the deterministic check is authoritative either way), it just skips the extra Gemma plausibility pre-screen (see [Current status](#current-status--honest-scope))
+- [Ollama](https://ollama.com) running the `gemma3:4b` model — optional; without it, verification still runs correctly (the deterministic check is authoritative either way), it just skips the extra Gemma plausibility pre-screen
 
-## Setup
+### 1. Clone & install
 
 ```bash
+git clone https://github.com/maha-rk/pact.git
+cd pact
+
 # Backend
 cd backend
 python3 -m venv .venv
@@ -201,7 +260,7 @@ cd ../frontend
 npm install
 ```
 
-### Gemini (optional but recommended)
+### 2. Configure Gemini (optional but recommended)
 
 ```bash
 cd backend
@@ -217,9 +276,9 @@ a compliance verdict. If the Gemini call fails or times out for any
 reason, the system falls back to the deterministic template automatically
 and logs a `narration_degraded` event rather than blocking the decision
 (PRD §27). The same key also powers the photo/voice requirement intake
-(FR-1) described below.
+(FR-1).
 
-## Running it
+### 3. Run it
 
 Three backend services, then the frontend — four terminals, or run each with `&`:
 
@@ -271,18 +330,51 @@ cd backend && source .venv/bin/activate
 python -m pact.mcp_tools.server   # speaks real MCP over stdio; connect any MCP client
 ```
 
-## Tests
+## Configuration
+
+| Variable | Where | Required | Description |
+|---|---|---|---|
+| `GEMINI_API_KEY` | `backend/.env` | Optional (recommended) | Enables Gemini narration and photo/voice requirement intake (FR-1). Falls back to a deterministic reasoning template if absent — never blocks a negotiation. |
+
+## Security
+
+- **No payment or card information is required anywhere.** The
+  deployment path (Docker + ngrok, see [Deployment](#deployment)) was
+  deliberately chosen over billing-gated infrastructure for this reason.
+- **Vendor pricing data is public by construction** — both live pricing
+  sources are public, keyless APIs; no private or credentialed vendor
+  data is accessed.
+- **No end-user personal data is required** for the core negotiation
+  flow — a requirement is a business specification (budget, capacity,
+  contract terms), not personal information (PRD §26).
+- **API credentials are server-side only.** `GEMINI_API_KEY` is loaded
+  from a gitignored `.env` file, never exposed to the frontend or logged
+  in plaintext.
+- **CORS is restricted** to the known local frontend origins
+  (`localhost:5173`, `localhost:3000`).
+- **Explicit non-claim**: no formal security certification, penetration
+  testing, or compliance audit has been performed or is claimed
+  (PRD §26).
+
+## Testing
 
 ```bash
 cd backend && source .venv/bin/activate
-pytest tests/            # unit + integration (hits real AWS/Azure APIs) + e2e
+pytest tests/
 ```
 
-Integration tests that spawn the vendor services as real subprocesses
-(`test_vendor_client_live.py`, `test_flagship_scenario_live.py`,
-`test_api.py`) take a few seconds longer than the rest — they're proving
-the system negotiates over genuine HTTP between separate processes, not
-asserting against in-process function calls.
+| Layer | Count | What it proves |
+|---|---|---|
+| Unit | 13 | Deterministic concession-curve math, compliance rule matching — no external calls |
+| Integration | 19 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle |
+| E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
+| **Total** | **44** | |
+
+None of the integration or e2e tests mock the external APIs — they hit
+real AWS, real Azure, and (when a key is configured) the real Gemini API,
+which is why that layer takes a few seconds longer than a typical unit
+suite: it's proving the system works against the outside world, not
+against a stand-in for it.
 
 ## Evaluation harness
 
@@ -302,6 +394,39 @@ logged data with:
 ```bash
 bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/queries_aggregate.sql
 ```
+
+## Deployment
+
+**Cloud Run was not used.** It requires a linked billing account (even
+though actual usage would very likely stay within the free tier) — this
+build deliberately avoids requiring payment info anywhere, including
+here.
+
+Instead: `infra/huggingface/Dockerfile` builds a single container running
+all three backend services plus the built frontend behind one port
+(7860), tested and confirmed working locally. Hugging Face Spaces was
+evaluated as a free host for that container next, but its Docker SDK
+turned out to require a paid PRO subscription on their current pricing —
+also ruled out for the same no-payment reason.
+
+The container is instead exposed via **ngrok** (free account + authtoken,
+no card) for a real, working public URL:
+
+```bash
+docker build -f infra/huggingface/Dockerfile -t pact-deploy .
+docker run -d --name pact-deploy-run -p 7860:7860 -e GEMINI_API_KEY="<key>" pact-deploy
+ngrok http 7860
+```
+
+This is a real, live, working deployment — verified end to end (health
+check, frontend, and a full negotiation with correct results) over the
+actual public internet, not just localhost. Two honest caveats: it runs
+on the operator's own machine rather than a managed cloud host (the
+container must stay running for the URL to work), and ngrok's free tier
+issues a new random subdomain each time the tunnel restarts, and shows
+first-time visitors a one-click interstitial page before reaching the
+app. Both are disclosed limitations of the no-payment path chosen here,
+not attempts to hide them.
 
 ## Current status / honest scope
 
@@ -387,53 +512,44 @@ data. What's real right now:
   auto-submitted, preserving both the human-in-the-loop framing and the
   "no invented value" acceptance criterion.
 
-Not yet wired into the running system (see `docs/PRD.md` §11's Google
-Technology Stack table for the intended role of each):
-
-- **Gemini — per-move negotiation narration** — narrating individual
-  negotiation moves in real time (as opposed to the final Reasoning
-  statement, which is live) is designed but not yet connected.
-- **GCP vendor**, **RunPod vendor** — scaffolded, no real pricing
-  integration yet
-
-Nothing in this list is faked to appear more complete than it is — see
-`docs/PRD.md` §32 for the project's explicit non-claims.
+Not yet wired into the running system — see [Roadmap](#roadmap) below,
+and `docs/PRD.md` §11's Google Technology Stack table for the intended
+role of each. Nothing in this section is faked to appear more complete
+than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 
 </details>
 
-## Deployment
+## Roadmap
 
-**Cloud Run was not used.** It requires a linked billing account (even
-though actual usage would very likely stay within the free tier) — this
-build deliberately avoids requiring payment info anywhere, including
-here.
+- [ ] GCP and RunPod vendor integrations, wired to their real pricing APIs
+- [ ] Gemini narration of individual negotiation moves in real time, not
+      just the final Reasoning statement
+- [ ] Vertex AI as Gemini's production serving backbone — requires a
+      billing-enabled GCP project, deliberately deferred to avoid
+      requiring payment info during the build
+- [ ] Managed cloud hosting once a genuinely free, cardless option exists
+      (Cloud Run and Hugging Face Spaces were both evaluated and ruled
+      out for requiring billing — see [Deployment](#deployment))
 
-Instead: `infra/huggingface/Dockerfile` builds a single container running
-all three backend services plus the built frontend behind one port
-(7860), tested and confirmed working locally. Hugging Face Spaces was
-evaluated as a free host for that container next, but its Docker SDK
-turned out to require a paid PRO subscription on their current pricing —
-also ruled out for the same no-payment reason.
+## Contributing
 
-The container is instead exposed via **ngrok** (free account + authtoken,
-no card) for a real, working public URL:
-
-```bash
-docker build -f infra/huggingface/Dockerfile -t pact-deploy .
-docker run -d --name pact-deploy-run -p 7860:7860 -e GEMINI_API_KEY="<key>" pact-deploy
-ngrok http 7860
-```
-
-This is a real, live, working deployment — verified end to end (health
-check, frontend, and a full negotiation with correct results) over the
-actual public internet, not just localhost. Two honest caveats: it runs
-on the operator's own machine rather than a managed cloud host (the
-container must stay running for the URL to work), and ngrok's free tier
-issues a new random subdomain each time the tunnel restarts, and shows
-first-time visitors a one-click interstitial page before reaching the
-app. Both are disclosed limitations of the no-payment path chosen here,
-not attempts to hide them.
+This is a solo competition build, but the usual flow applies if you'd
+like to extend it: fork the repo, create a feature branch, and open a
+pull request. Before submitting, run `pytest tests/` in `backend/` and
+`npx tsc --noEmit` in `frontend/`.
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Acknowledgements
+
+- AI Agent Builder Series 2026 — the program this was built for
+- [AWS Price List Bulk API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) and [Azure Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices) — the real, public, keyless pricing data this whole build is grounded in
+- [Google AI Studio](https://aistudio.google.com) — Gemini API access used throughout the build
+- The [Model Context Protocol](https://modelcontextprotocol.io) and [Google Agent Development Kit](https://google.github.io/adk-docs/) open-source SDKs
+
+## Author
+
+**Mahashri RK**
+- GitHub: [@maha-rk](https://github.com/maha-rk)
