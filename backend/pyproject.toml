@@ -12,6 +12,7 @@ dependencies = [
     "google-cloud-bigquery>=3.25",
     "pyyaml>=6.0",
     "ijson>=3.3",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]

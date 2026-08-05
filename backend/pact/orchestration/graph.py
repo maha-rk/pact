@@ -35,6 +35,7 @@ def run_negotiation(
     initial_claimed_discounts: dict[VendorId, float],
     max_rounds: int = DEFAULT_MAX_ROUNDS,
     vendor_client: HttpVendorClient | None = None,
+    narrator: decision_agent.Narrator | None = None,
 ) -> NegotiationState:
     """If `vendor_client` is provided, each round's vendor offer is
     fetched over real HTTP from that vendor's genuinely separate service
@@ -71,7 +72,7 @@ def run_negotiation(
     if not state.active_vendors:
         state.status = NegotiationStatus.NO_COMPLIANT_DEAL
         state.log(EventType.NO_COMPLIANT_DEAL, detail="No vendors passed identity verification")
-        state.decision = decision_agent.build_decision(state.negotiation_id, None, None, None)
+        state.decision, _ = decision_agent.build_decision(state.negotiation_id, None, None, None)
         return state
 
     list_prices = {v: pricing_source.list_price(v, requirement) for v in state.active_vendors}
@@ -194,13 +195,20 @@ def run_negotiation(
             EventType.NO_COMPLIANT_DEAL,
             detail="No vendor produced a verified, compliant offer within the round limit",
         )
-        state.decision = decision_agent.build_decision(state.negotiation_id, None, None, None)
+        state.decision, _ = decision_agent.build_decision(state.negotiation_id, None, None, None)
         return state
 
     state.status = NegotiationStatus.AGREED_PENDING_APPROVAL
-    state.decision = decision_agent.build_decision(
-        state.negotiation_id, winning_offer, winning_verification, winning_compliance
+    state.decision, narrator_error = decision_agent.build_decision(
+        state.negotiation_id, winning_offer, winning_verification, winning_compliance, narrator=narrator
     )
+    if narrator_error is not None:
+        state.log(
+            EventType.NARRATION_DEGRADED,
+            vendor_id=winning_offer.vendor_id,
+            round_number=winning_offer.round_number,
+            detail=f"Gemini narration unavailable ({narrator_error}); used deterministic reasoning template instead",
+        )
     state.log(
         EventType.DECISION_PRODUCED,
         vendor_id=winning_offer.vendor_id,

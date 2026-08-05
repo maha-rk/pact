@@ -33,6 +33,7 @@ class EventType(str, Enum):
     DECISION_APPROVED = "decision_approved"
     NO_COMPLIANT_DEAL = "no_compliant_deal"
     VENDOR_UNAVAILABLE = "vendor_unavailable"
+    NARRATION_DEGRADED = "narration_degraded"
 
 
 class NegotiationEvent(BaseModel):

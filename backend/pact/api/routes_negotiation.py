@@ -7,6 +7,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+import os
+
 from pact.a2a.vendor_client import HttpVendorClient
 from pact.models.schemas import AgentCard, PolicyConstraints, Requirement, VendorId
 from pact.orchestration import approval
@@ -67,6 +69,17 @@ def _pricing_source():
     return _Combined()
 
 
+def _narrator():
+    """Real Gemini narration if a key is configured; None otherwise --
+    the deterministic template fallback in decision_agent handles that
+    case gracefully (PRD §27)."""
+    if not os.environ.get("GEMINI_API_KEY"):
+        return None
+    from pact.models.gemini_client import narrate_reasoning
+
+    return narrate_reasoning
+
+
 @router.post("", response_model=NegotiationState)
 def create_negotiation(req: NegotiationRequest) -> NegotiationState:
     requirement = Requirement(
@@ -92,6 +105,7 @@ def create_negotiation(req: NegotiationRequest) -> NegotiationState:
         pricing_source=_pricing_source(),
         initial_claimed_discounts=req.initial_claimed_discounts,
         vendor_client=HttpVendorClient(VENDOR_ENDPOINTS),
+        narrator=_narrator(),
     )
     _STORE[state.negotiation_id] = state
     return state

@@ -54,6 +54,23 @@ cd ../frontend
 npm install
 ```
 
+### Gemini (optional but recommended)
+
+```bash
+cd backend
+cp .env.example .env
+# edit .env, set GEMINI_API_KEY to a real key from https://aistudio.google.com
+```
+
+Without a key, the Decision Agent still produces a correct, evidence-backed
+reasoning statement from a deterministic template — Gemini only narrates
+the same facts in richer natural language (PRD §16), and its role is
+strictly narration, never determining a price, a verification verdict, or
+a compliance verdict. If the Gemini call fails or times out for any
+reason, the system falls back to the deterministic template automatically
+and logs a `narration_degraded` event rather than blocking the decision
+(PRD §27).
+
 ## Running it
 
 Three backend services, then the frontend — four terminals, or run each with `&`:
@@ -131,13 +148,23 @@ data. What's real right now:
 - Genuinely separate vendor services negotiating over real HTTP
 - The human approval gate (nothing finalizes without it)
 - The evaluation harness, computing real statistics from real runs
+- **Gemini** — real narration of the Decision Agent's reasoning
+  (`pact/models/gemini_client.py`), strictly isolated from the
+  price-decision path; bounded to a 10s timeout with one retry, and
+  degrades to a deterministic template (logged as `narration_degraded`,
+  never silent) if the call fails — verified working both ways against
+  the live API, including under a real transient Gemini outage during
+  development
 
 Not yet wired into the running system (see `docs/PRD.md` §11's Google
 Technology Stack table for the intended role of each):
 
-- **Gemini** — narration/parsing role designed and isolated from the
-  price-decision path (`pact/agents/negotiation_agent.py`,
-  `decision_agent.py`), not yet connected to a live API key
+- **Gemini — requirement parsing and per-move narration** — the Reasoning
+  narration above is live; parsing free-text/voice/photo input (FR-1) and
+  narrating individual negotiation moves are designed but not yet
+  connected. Typed structured input (what the form/API accept today) is
+  still honest, non-fabricated input — just a narrower slice of FR-1 than
+  the full modality set.
 - **Gemma** — pulled and running locally via Ollama, not yet wired into
   the Verification Agent's pre-screening step
 - **BigQuery** — the negotiation log/event schema (`orchestration/state.py`)
