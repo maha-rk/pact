@@ -65,4 +65,13 @@ def narrate_reasoning(
             last_error = exc
             if attempt < _MAX_ATTEMPTS:
                 time.sleep(_RETRY_DELAY_SECONDS)
+
+    from pact.models.vertex_fallback import generate_via_vertex, vertex_configured
+
+    if vertex_configured():
+        try:
+            return generate_via_vertex(prompt)
+        except Exception:
+            pass  # Vertex AI fallback also failed -- raise the original Developer API error below
+
     raise last_error  # type: ignore[misc]

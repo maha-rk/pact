@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-47-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-48-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
@@ -403,9 +403,9 @@ pytest tests/
 | Layer | Count | What it proves |
 |---|---|---|
 | Unit | 13 | Deterministic concession-curve math, compliance rule matching — no external calls |
-| Integration | 22 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection |
+| Integration | 23 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection, a real Vertex AI fallback |
 | E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
-| **Total** | **47** | |
+| **Total** | **48** | |
 
 None of the integration or e2e tests mock the external APIs — they hit
 real AWS, real Azure, and (when a key is configured) the real Gemini API,
@@ -446,9 +446,9 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | Real Google ADK orchestration (`SequentialAgent` + `Runner`) | ✅ Implemented and tested |
 | Gemini Vision photo/voice requirement intake (FR-1) | ✅ Implemented and tested |
 | Self-hosted prompt-injection + PII guardrails on text/voice intake | ✅ Implemented and tested |
+| Vertex AI fallback for both Gemini call sites | ✅ Implemented and tested — real fallback, not the default path |
 | Gemini narration of individual negotiation moves, not just the final decision | 🔭 Designed, not yet connected |
 | GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
-| Vertex AI as Gemini's production serving backbone | 🔭 Deferred — requires a billing-enabled GCP project |
 | Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
 
 ## Honest Limitations
@@ -569,6 +569,19 @@ data. What's real right now:
   authoritative; findings surface as warnings in the UI next to the
   pre-filled form, reinforcing the human review already required before
   a negotiation starts, rather than blocking anything silently.
+- **Vertex AI — real, tested fallback, not the default path** —
+  `pact/models/vertex_fallback.py` wraps a real Vertex AI call
+  (`gemini-2.5-flash`, via Application Default Credentials against the
+  `pact-hackathon` GCP project), only attempted after the Developer
+  API's own retries are exhausted in both `gemini_client.py` and
+  `requirement_parser.py`. The Developer API (a flat API key, no billing
+  dependency) remains the default deliberately — this build has hit its
+  free-tier rate limit more than once during development, and the
+  fallback exists specifically to survive that, not to replace the
+  primary path. Verified for real: `tests/integration/test_vertex_fallback.py`
+  forces the Developer API call to fail (an intentionally invalid key)
+  and confirms Vertex AI genuinely serves the response — skips
+  gracefully (like Ollama/Gemma) if `GCP_PROJECT_ID` isn't configured.
 
 Not yet wired into the running system — see [Roadmap](#roadmap) below,
 and `docs/PRD.md` §11's Google Technology Stack table for the intended
@@ -582,9 +595,6 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 - [ ] GCP and RunPod vendor integrations, wired to their real pricing APIs
 - [ ] Gemini narration of individual negotiation moves in real time, not
       just the final Reasoning statement
-- [ ] Vertex AI as Gemini's production serving backbone — requires a
-      billing-enabled GCP project, deliberately deferred to avoid
-      requiring payment info during the build
 - [ ] Managed cloud hosting once a genuinely free, cardless option exists
       (Cloud Run and Hugging Face Spaces were both evaluated and ruled
       out for requiring billing — see [Deployment](#deployment))
@@ -592,9 +602,8 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 ```mermaid
 flowchart LR
     A["✅ Working Build<br/>AWS + Azure, real data"] --> B["🔌 GCP + RunPod<br/>real vendor integrations"]
-    B --> C["📈 Vertex AI<br/>production model serving"]
-    C --> D["☁️ Managed Hosting<br/>beyond ngrok"]
-    D --> E["🏢 Agent Commerce Network<br/>beyond cloud compute procurement"]
+    B --> C["☁️ Managed Hosting<br/>beyond ngrok"]
+    C --> D["🏢 Agent Commerce Network<br/>beyond cloud compute procurement"]
 ```
 
 The roadmap preserves the core invariant: **verify every claim, enforce

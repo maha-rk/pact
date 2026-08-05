@@ -144,7 +144,7 @@ flowchart TB
     end
 
     subgraph MODELS["Model Serving — two distinct jobs"]
-        GEMINI["Gemini (via Vertex AI)<br/>deep reasoning:<br/>requirement parsing,<br/>negotiation narration,<br/>ambiguous edge cases"]
+        GEMINI["Gemini (Developer API, default;<br/>Vertex AI real, tested fallback)<br/>deep reasoning:<br/>requirement parsing,<br/>negotiation narration,<br/>ambiguous edge cases"]
         GEMMA["Gemma (self-hosted, Cloud Run)<br/>fast, cheap, high-frequency:<br/>verification pre-screening<br/>during live negotiation ticks"]
     end
 
@@ -153,12 +153,12 @@ flowchart TB
     subgraph INFRA["Infrastructure"]
         CLOUDRUN["Cloud Run<br/>app + Gemma inference service"]
         BIGQUERY["BigQuery<br/>every negotiation logged;<br/>backs the evaluation harness"]
-        VERTEXAI["Vertex AI<br/>Gemini serving backbone"]
+        VERTEXAI["Vertex AI<br/>real, tested fallback only —<br/>not the default serving path"]
     end
 
     OTEL["OpenTelemetry tracing<br/>token usage · latency · prompt hashes<br/>target design, not yet built — PRD §23b"]
 
-    GEMINI --> VERTEXAI
+    GEMINI -.->|fallback only, on Developer API failure| VERTEXAI
     MCP -.->|used by Discovery,<br/>Negotiation, Verification agents| MODELS
     MODELS --> CLOUDRUN
     BIGQUERY --> CLOUDRUN
