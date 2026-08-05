@@ -3,7 +3,7 @@
   <!-- <img src="docs/screenshots/hero.png" alt="Pact — autonomous B2B procurement negotiation" width="100%" /> -->
 </p>
 
-<h1 align="center">🤝 Pact</h1>
+<h1 align="center">Pact</h1>
 
 <p align="center">
   <strong>Autonomous B2B Procurement Negotiation</strong><br/>
@@ -35,7 +35,7 @@
 
 ---
 
-## 🏆 Competition Mission
+## Competition Mission
 
 **AI Agent Builder Series 2026 Grand Finale · B2B Services · #7 Vendor Evaluation**
 
@@ -47,18 +47,18 @@ Pact turns that question into a bounded, reproducible negotiation:
 
 ```mermaid
 flowchart LR
-    A["📝 Requirement"] --> B["🔎 Discover"]
-    B --> C["🤝 Negotiate"]
-    C --> D["🔍 Verify"]
-    D --> E["🛡️ Enforce Policy"]
-    E --> F["👤 Human Decision"]
+    A["📝 Requirement"] --> B["Discover"]
+    B --> C["Negotiate"]
+    C --> D["Verify"]
+    D --> E["Enforce Policy"]
+    E --> F["Human Decision"]
 ```
 
 This is not a vendor comparison table. It is a system that negotiates on your behalf, catches a vendor's claim that doesn't hold up against real data, rejects a deal that violates your own policy — even the cheapest one — and stops at the human-control boundary.
 
 ---
 
-## 🔐 Safety by Design
+## Safety by Design
 
 Only the negotiation pipeline itself — never a human, never an LLM — decides whether a claim matches real data or a deal passes policy. The one thing reserved for a human is the very last step.
 
@@ -71,7 +71,7 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 
 ---
 
-## 📊 Validation Evidence
+## Validation Evidence
 
 | Technical question | Evidence-backed answer |
 |---|---|
@@ -86,21 +86,21 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 
 ---
 
-## ✨ Why Pact Stands Out
+## Why Pact Stands Out
 
 | Capability | What you get | Why it matters |
 |---|---|---|
-| 🤝 Real agent-to-agent negotiation | Genuinely separate Buyer and Vendor HTTP services negotiating over real requests | Not one application internally pretending to be several agents |
-| 🔍 Independent claim verification | Every claimed discount checked against a live external source before it counts | A vendor's number is a negotiating position, not a fact, until confirmed |
-| 🛡️ Policy overrides price | Budget, blocked-vendor, and certification checks that reject even the cheapest offer | Compliance is a rule, not a suggestion an optimizer can trade away |
-| 📄 Evidence-backed decisions | Decision + Evidence + Reasoning, every item traceable to a real source | Never a bare confidence score with nothing behind it |
-| 🔁 Full negotiation replay | A timestamped timeline of every offer, check, and renegotiation | An audit trail a reviewer can inspect without re-running anything |
-| 📈 Self-measuring evaluation harness | Real aggregate statistics computed via SQL from real logged runs | No claimed savings number that isn't backed by a re-runnable run |
-| 📷🎙️ Photo/voice requirement intake | Structured fields extracted from a photographed quote or a spoken transcript | Missing fields come back `null`, never an invented value |
+| Real agent-to-agent negotiation | Genuinely separate Buyer and Vendor HTTP services negotiating over real requests | Not one application internally pretending to be several agents |
+| Independent claim verification | Every claimed discount checked against a live external source before it counts | A vendor's number is a negotiating position, not a fact, until confirmed |
+| Policy overrides price | Budget, blocked-vendor, and certification checks that reject even the cheapest offer | Compliance is a rule, not a suggestion an optimizer can trade away |
+| Evidence-backed decisions | Decision + Evidence + Reasoning, every item traceable to a real source | Never a bare confidence score with nothing behind it |
+| Full negotiation replay | A timestamped timeline of every offer, check, and renegotiation | An audit trail a reviewer can inspect without re-running anything |
+| Self-measuring evaluation harness | Real aggregate statistics computed via SQL from real logged runs | No claimed savings number that isn't backed by a re-runnable run |
+| Photo/voice requirement intake | Structured fields extracted from a photographed quote or a spoken transcript | Missing fields come back `null`, never an invented value |
 
 ---
 
-## 🎯 Canonical Product Workflow
+## Canonical Product Workflow
 
 The flagship scenario is 8× H100 GPUs, a 3-month contract, and a $115,000 budget. Pact:
 
@@ -117,7 +117,7 @@ The flagship scenario is 8× H100 GPUs, a 3-month contract, and a $115,000 budge
 
 ---
 
-## 🛡️ Evidence & Policy Gates
+## Evidence & Policy Gates
 
 > [!CAUTION]
 > **Policy overrides price.** A verified offer that violates budget, a blocked-vendor rule, or a required certification is rejected regardless of price (PRD §19) — see the row below.
@@ -156,7 +156,7 @@ Reproduce every figure above yourself with
 
 ---
 
-## 🎬 Recommended Demo Route
+## Recommended Demo Route
 
 This walkthrough drives the actual running UI — nothing here is staged or pre-recorded.
 
@@ -170,7 +170,7 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 
 ---
 
-## 🧰 Tech Stack
+## Tech Stack
 
 | Layer | Technology | Purpose |
 |---|---|---|
@@ -188,7 +188,7 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -244,7 +244,7 @@ sequenceDiagram
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 docs/                   PRD and architecture documentation
@@ -270,7 +270,7 @@ frontend/                 Vite + React + TypeScript UI (Decision view, Replay ti
 infra/                    bigquery/ (schema + aggregate query), huggingface/ (deployment container)
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -365,7 +365,7 @@ python -m pact.mcp_tools.server   # speaks real MCP over stdio; connect any MCP 
 |---|---|---|---|
 | `GEMINI_API_KEY` | `backend/.env` | Optional (recommended) | Enables Gemini narration and photo/voice requirement intake (FR-1). Falls back to a deterministic reasoning template if absent — never blocks a negotiation. |
 
-## 🔒 Security
+## Security
 
 - **No payment or card information is required anywhere.** The
   deployment path (Docker + ngrok, see [Deployment](#deployment)) was
@@ -385,7 +385,7 @@ python -m pact.mcp_tools.server   # speaks real MCP over stdio; connect any MCP 
   testing, or compliance audit has been performed or is claimed
   (PRD §26).
 
-## ✅ Testing
+## Testing
 
 ```bash
 cd backend && source .venv/bin/activate
@@ -405,7 +405,7 @@ which is why that layer takes a few seconds longer than a typical unit
 suite: it's proving the system works against the outside world, not
 against a stand-in for it.
 
-## 📈 Evaluation harness
+## Evaluation harness
 
 ```bash
 cd backend && source .venv/bin/activate
@@ -425,7 +425,7 @@ aggregate query against actual logged data with:
 bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/queries_aggregate.sql
 ```
 
-## 📋 Implementation Status
+## Implementation Status
 
 | Layer | Status |
 |---|---|
@@ -442,7 +442,7 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | Vertex AI as Gemini's production serving backbone | 🔭 Deferred — requires a billing-enabled GCP project |
 | Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
 
-## ⚖️ Honest Limitations
+## Honest Limitations
 
 - Only AWS and Azure are wired to real pricing data today; GCP and
   RunPod are scaffolded but not live.
@@ -462,7 +462,7 @@ Transparent limitations distinguish what is genuinely working today from
 what is designed but not yet built — the full breakdown below covers
 exactly what was verified and how.
 
-## 🔬 Current status / honest scope
+## Current status / honest scope
 
 <details>
 <summary>Full breakdown of what's genuinely live versus not (click to expand)</summary>
@@ -553,7 +553,7 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 
 </details>
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [ ] GCP and RunPod vendor integrations, wired to their real pricing APIs
 - [ ] Gemini narration of individual negotiation moves in real time, not
@@ -576,7 +576,7 @@ flowchart LR
 The roadmap preserves the core invariant: **verify every claim, enforce
 policy as a hard gate, human approval always.**
 
-## ☁️ Deployment
+## Deployment
 
 **Cloud Run was not used.** It requires a linked billing account (even
 though actual usage would very likely stay within the free tier) — this
@@ -609,7 +609,7 @@ first-time visitors a one-click interstitial page before reaching the
 app. Both are disclosed limitations of the no-payment path chosen here,
 not attempts to hide them.
 
-## ❓ Technical Q&A
+## Technical Q&A
 
 <details>
 <summary><strong>How is a vendor's claim actually verified?</strong></summary>
@@ -678,38 +678,24 @@ outcomes. Anyone can independently verify the real numbers by querying
 the same public APIs Pact uses.
 </details>
 
-## 📚 Documentation
+## Documentation
 
 | Guide | Purpose |
 |---|---|
 | [Product Requirements](docs/PRD.md) | Full requirements, functional requirements (FR-1–10), acceptance criteria, and explicit non-claims |
 | [Architecture](docs/ARCHITECTURE.md) | The six-agent pipeline, negotiation sequence, data/infrastructure layer, and evaluation harness pipeline, each diagrammed |
 
-## 🧑‍💻 Contributing
-
-This is a solo competition build, but the usual flow applies if you'd
-like to extend it: fork the repo, create a feature branch, and open a
-pull request. Before submitting, run `pytest tests/` in `backend/` and
-`npx tsc --noEmit` in `frontend/`. Changes should preserve the
-deterministic concession-curve math, the independent verification gate,
-the compliance policy gate, and the human approval boundary described
-above.
-
-## 📜 License
+## License
 
 MIT — see [LICENSE](LICENSE).
 
-## 🙏 Acknowledgements
+## Acknowledgements
 
 - AI Agent Builder Series 2026 — the program this was built for
 - [AWS Price List Bulk API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) and [Azure Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices) — the real, public, keyless pricing data this whole build is grounded in
 - [Google AI Studio](https://aistudio.google.com) — Gemini API access used throughout the build
 - The [Model Context Protocol](https://modelcontextprotocol.io) and [Google Agent Development Kit](https://google.github.io/adk-docs/) open-source SDKs
 
-## 👩‍💻 Author
-
-**Mahashri RK**
-- GitHub: [@maha-rk](https://github.com/maha-rk)
 
 ---
 
