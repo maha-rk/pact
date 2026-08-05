@@ -1,0 +1,179 @@
+"""The 6-agent pipeline: Buyer -> Discovery -> Negotiation -> then, in
+order, the Verification gate -> Compliance gate -> Comparison (PRD §19),
+with two feedback loops back to Negotiation (verification-mismatch and
+compliance-violation). This is the authoritative gate order -- it matches
+§19 and the ARCHITECTURE.md §3 sequence diagram, not the inconsistent box
+order in ARCHITECTURE.md §2 (see the build plan for why)."""
+
+from __future__ import annotations
+
+import uuid
+
+from pact.agents import compliance_agent, decision_agent, discovery_agent, verification_agent
+from pact.agents.negotiation_agent import buyer_offer_at_round, vendor_offer_at_round
+from pact.mcp_tools.pricing_tool import PricingSource
+from pact.models.schemas import AgentCard, Offer, PolicyConstraints, Requirement, VendorId
+from pact.orchestration.state import EventType, NegotiationState, NegotiationStatus
+
+DEFAULT_MAX_ROUNDS = 6
+DEFAULT_BUYER_OPENING_FRACTION = 0.67
+"""The buyer's opening bid as a fraction of the average opening vendor
+price -- an aggressive first offer, per standard concession-curve practice."""
+
+
+def run_negotiation(
+    requirement: Requirement,
+    policy: PolicyConstraints,
+    candidate_vendors: list[VendorId],
+    agent_cards: dict[VendorId, AgentCard],
+    pricing_source: PricingSource,
+    initial_claimed_discounts: dict[VendorId, float],
+    max_rounds: int = DEFAULT_MAX_ROUNDS,
+) -> NegotiationState:
+    state = NegotiationState(
+        negotiation_id=str(uuid.uuid4()),
+        requirement=requirement,
+        policy=policy,
+    )
+    state.log(EventType.REQUIREMENT_RECEIVED, detail=requirement.raw_input)
+
+    # --- Discovery Agent: verify identity before negotiating (FR-2) ---
+    for vendor_id in candidate_vendors:
+        card = agent_cards[vendor_id]
+        if discovery_agent.verify_agent_card(card):
+            state.active_vendors.append(vendor_id)
+            state.log(
+                EventType.VENDOR_DISCOVERED,
+                vendor_id=vendor_id,
+                detail=f"Agent Card verified: {card.name} ({card.endpoint})",
+            )
+        else:
+            state.unavailable_vendors.append(vendor_id)
+            state.log(
+                EventType.VENDOR_UNAVAILABLE,
+                vendor_id=vendor_id,
+                detail="Agent Card missing required fields or unreachable",
+            )
+
+    if not state.active_vendors:
+        state.status = NegotiationStatus.NO_COMPLIANT_DEAL
+        state.log(EventType.NO_COMPLIANT_DEAL, detail="No vendors passed identity verification")
+        state.decision = decision_agent.build_decision(state.negotiation_id, None, None, None)
+        return state
+
+    list_prices = {v: pricing_source.list_price(v, requirement) for v in state.active_vendors}
+    current_claimed_discount = dict(initial_claimed_discounts)
+    buyer_opening = sum(list_prices.values()) / len(list_prices) * DEFAULT_BUYER_OPENING_FRACTION
+
+    winning_offer: Offer | None = None
+    winning_verification = None
+    winning_compliance = None
+
+    for round_number in range(1, max_rounds + 1):
+        buyer_price = buyer_offer_at_round(buyer_opening, requirement.budget_ceiling_usd, round_number, max_rounds)
+        round_price_acceptable: list[tuple[Offer, object]] = []  # (offer, verification)
+
+        # --- Negotiation Agent: simultaneous offers to every active vendor (FR-3) ---
+        for vendor_id in state.active_vendors:
+            offer = vendor_offer_at_round(
+                vendor_id=vendor_id,
+                list_price=list_prices[vendor_id],
+                claimed_discount_rate=current_claimed_discount[vendor_id],
+                round_number=round_number,
+                max_rounds=max_rounds,
+            )
+            state.offers.append(offer)
+            state.log(
+                EventType.OFFER_MADE,
+                vendor_id=vendor_id,
+                round_number=round_number,
+                detail=f"${offer.price_usd:,.2f} (claims {offer.claimed_discount_rate:.0%} discount)",
+            )
+
+            # --- Verification gate: every claim checked, every round (FR-5) ---
+            result = verification_agent.verify(offer, requirement, pricing_source)
+            state.verification_results.append(result)
+            if result.matched:
+                state.log(
+                    EventType.CLAIM_VERIFIED,
+                    vendor_id=vendor_id,
+                    round_number=round_number,
+                    detail=f"Claimed {result.claimed_value:.0%} matches real rate ({result.source})",
+                )
+            else:
+                state.log(
+                    EventType.CLAIM_REJECTED,
+                    vendor_id=vendor_id,
+                    round_number=round_number,
+                    detail=(
+                        f"Claimed {result.claimed_value:.0%} does not match real "
+                        f"{result.actual_value:.0%} ({result.source})"
+                    ),
+                )
+                state.log(
+                    EventType.RENEGOTIATION_TRIGGERED,
+                    vendor_id=vendor_id,
+                    round_number=round_number,
+                    detail="Claim rejected; vendor challenged to renegotiate with a corrected rate",
+                )
+                # Correction: from the NEXT round on, this vendor claims the real rate.
+                current_claimed_discount[vendor_id] = result.actual_value
+                continue  # this round's offer does not proceed to compliance/comparison
+
+            if offer.price_usd <= buyer_price:
+                round_price_acceptable.append((offer, result))
+
+        # --- Compliance gate: verified, price-acceptable offers only (FR-6) ---
+        round_compliant: list[tuple[Offer, object, object]] = []
+        for offer, verification in round_price_acceptable:
+            compliance = compliance_agent.check_compliance(offer, policy)
+            state.compliance_results.append(compliance)
+            if compliance.passed:
+                state.log(
+                    EventType.COMPLIANCE_PASSED,
+                    vendor_id=offer.vendor_id,
+                    round_number=round_number,
+                    detail=compliance.detail,
+                )
+                round_compliant.append((offer, verification, compliance))
+            else:
+                state.log(
+                    EventType.COMPLIANCE_REJECTED,
+                    vendor_id=offer.vendor_id,
+                    round_number=round_number,
+                    detail=compliance.detail,
+                )
+                state.log(
+                    EventType.RENEGOTIATION_TRIGGERED,
+                    vendor_id=offer.vendor_id,
+                    round_number=round_number,
+                    detail="Deal rejected on policy grounds; renegotiating with an alternative vendor",
+                )
+
+        # --- Comparison: best offer among vendors passing both gates (§19) ---
+        if round_compliant:
+            winning_offer, winning_verification, winning_compliance = min(
+                round_compliant, key=lambda item: item[0].price_usd
+            )
+            break
+
+    if winning_offer is None:
+        state.status = NegotiationStatus.NO_COMPLIANT_DEAL
+        state.log(
+            EventType.NO_COMPLIANT_DEAL,
+            detail="No vendor produced a verified, compliant offer within the round limit",
+        )
+        state.decision = decision_agent.build_decision(state.negotiation_id, None, None, None)
+        return state
+
+    state.status = NegotiationStatus.AGREED_PENDING_APPROVAL
+    state.decision = decision_agent.build_decision(
+        state.negotiation_id, winning_offer, winning_verification, winning_compliance
+    )
+    state.log(
+        EventType.DECISION_PRODUCED,
+        vendor_id=winning_offer.vendor_id,
+        round_number=winning_offer.round_number,
+        detail=state.decision.reasoning,
+    )
+    return state
