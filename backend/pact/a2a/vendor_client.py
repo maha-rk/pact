@@ -26,7 +26,14 @@ class VendorUnavailableError(Exception):
 
 
 class HttpVendorClient:
-    def __init__(self, endpoints: dict[VendorId, str], timeout: float = 10.0):
+    # Must exceed the slowest real external call a vendor service makes
+    # internally (AzurePricingClient's own httpx call to the live Azure
+    # Retail Prices API uses a 30s timeout) -- otherwise this outer
+    # client can time out while that legitimately-still-running inner
+    # call would have succeeded, which is exactly what happened under
+    # GitHub Actions' network latency to Azure's API (caught via a real
+    # CI run, not assumed).
+    def __init__(self, endpoints: dict[VendorId, str], timeout: float = 35.0):
         self._endpoints = endpoints
         self._timeout = timeout
 
