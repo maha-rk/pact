@@ -9,6 +9,24 @@ approval action.
 
 Full product and architecture documentation: [`docs/PRD.md`](docs/PRD.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
+## Screenshots
+
+<!-- TODO: add screenshots before submission -->
+<!-- Decision / Evidence / Reasoning view: ![Decision view](docs/screenshots/decision-view.png) -->
+<!-- Negotiation Replay timeline: ![Replay timeline](docs/screenshots/replay-timeline.png) -->
+
+## Contents
+
+- [Repository layout](#repository-layout)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Running it](#running-it)
+- [Tests](#tests)
+- [Evaluation harness](#evaluation-harness)
+- [Current status / honest scope](#current-status--honest-scope)
+- [Deployment](#deployment)
+- [License](#license)
+
 ## Repository layout
 
 ```
@@ -30,16 +48,16 @@ backend/
     gcp_vendor/, runpod_vendor/   Scaffolded, not yet wired to a real API
   eval/                   Scenario catalogue (PRD §18) + real aggregate results
   scripts/                run_scenario.py (single run), run_catalogue.py (evaluation harness)
-  tests/                  unit / integration / e2e / failure_path
+  tests/                  unit / integration / e2e (failure_path/ is scaffolded, no tests written yet)
 frontend/                 Vite + React + TypeScript UI (Decision view, Replay timeline)
-infra/                    Deployment configs (Cloud Run, BigQuery) — not yet populated
+infra/                    bigquery/ (schema + aggregate query), huggingface/ (deployment container)
 ```
 
 ## Prerequisites
 
 - Python 3.11+
 - Node 18+
-- [Ollama](https://ollama.com) (for self-hosted Gemma) — optional for the current build; Gemma isn't wired into the running pipeline yet (see Current Status below)
+- [Ollama](https://ollama.com) running the `gemma3:4b` model — optional; without it, verification still runs correctly (the deterministic check is authoritative either way), it just skips the extra Gemma plausibility pre-screen (see Current Status below)
 
 ## Setup
 
@@ -90,6 +108,13 @@ Open `http://localhost:5173`. The form is pre-filled with the PRD's
 Flagship Demonstration Scenario (8× H100, 3-month contract, $115,000
 budget). Click **Start negotiation** to run it live against the real AWS
 and Azure vendor services.
+
+Instead of the pre-filled form, you can also populate it from a photo of
+a quote/invoice (**📷 Upload a photo of a quote/invoice**) or by speaking
+the requirement out loud (**🎙️ Speak your requirement**, Chrome/Edge
+only) — both call real Gemini Vision to extract fields (FR-1; requires
+`GEMINI_API_KEY`) and pre-fill the form for you to review before starting
+a negotiation.
 
 ### Or drive the API directly
 
@@ -210,7 +235,6 @@ data. What's real right now:
   numbers as the direct path, plus that the two ADK agents genuinely ran
   in order. `orchestration/graph.run_negotiation` remains what the live
   API, CLI, and every other test call directly.
-
 - **Gemini Vision — photo/voice requirement intake (FR-1)** —
   `pact/models/requirement_parser.py` calls real Gemini Vision (structured
   JSON output via `response_json_schema`) to extract `gpu_count`,
@@ -275,3 +299,7 @@ issues a new random subdomain each time the tunnel restarts, and shows
 first-time visitors a one-click interstitial page before reaching the
 app. Both are disclosed limitations of the no-payment path chosen here,
 not attempts to hide them.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
