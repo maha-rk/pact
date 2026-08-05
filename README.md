@@ -1,0 +1,154 @@
+# Pact
+
+Autonomous B2B procurement negotiation. A Buyer Agent negotiates
+simultaneously with independent Vendor Agents over real HTTP, verifies
+every vendor claim against real, live pricing data, enforces policy as a
+hard gate, and produces an evidence-backed decision for human approval —
+nothing is fabricated, and nothing is finalized without an explicit
+approval action.
+
+Full product and architecture documentation: [`docs/PRD.md`](docs/PRD.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Repository layout
+
+```
+docs/                   PRD and architecture documentation
+backend/
+  pact/                 Core package: 6-agent pipeline, orchestration, API
+    agents/             Buyer, Discovery, Negotiation, Verification, Compliance, Decision
+    negotiation/         Deterministic concession-curve logic (no LLM in the price path)
+    orchestration/        The pipeline (graph.py), state/event log, human approval gate
+    mcp_tools/            pricing_lookup / verify_claim tool wrappers
+    a2a/                  HTTP-based vendor transport (see note below)
+    models/               Shared data schemas
+    api/                  FastAPI routes (pact-core)
+    main.py               pact-core entrypoint
+  vendors/
+    aws_vendor/            Real AWS Price List Bulk API integration
+    azure_vendor/           Real, live Azure Retail Prices API integration
+    gcp_vendor/, runpod_vendor/   Scaffolded, not yet wired to a real API
+  eval/                   Scenario catalogue (PRD §18) + real aggregate results
+  scripts/                run_scenario.py (single run), run_catalogue.py (evaluation harness)
+  tests/                  unit / integration / e2e / failure_path
+frontend/                 Vite + React + TypeScript UI (Decision view, Replay timeline)
+infra/                    Deployment configs (Cloud Run, BigQuery) — not yet populated
+```
+
+## Prerequisites
+
+- Python 3.11+
+- Node 18+
+- [Ollama](https://ollama.com) (for self-hosted Gemma) — optional for the current build; Gemma isn't wired into the running pipeline yet (see Current Status below)
+
+## Setup
+
+```bash
+# Backend
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Frontend
+cd ../frontend
+npm install
+```
+
+## Running it
+
+Three backend services, then the frontend — four terminals, or run each with `&`:
+
+```bash
+cd backend && source .venv/bin/activate
+uvicorn vendors.aws_vendor.app:app --port 9001    # AWS vendor (real AWS Price List Bulk API)
+uvicorn vendors.azure_vendor.app:app --port 9002   # Azure vendor (real Azure Retail Prices API)
+uvicorn pact.main:app --port 8000                  # pact-core API
+
+cd frontend
+npm run dev   # http://localhost:5173
+```
+
+Open `http://localhost:5173`. The form is pre-filled with the PRD's
+Flagship Demonstration Scenario (8× H100, 3-month contract, $115,000
+budget). Click **Start negotiation** to run it live against the real AWS
+and Azure vendor services.
+
+### Or drive the API directly
+
+```bash
+curl -X POST http://localhost:8000/negotiations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gpu_count": 8, "contract_months": 3, "budget_ceiling_usd": 115000,
+    "raw_input": "Need 8 H100 GPUs, 3-month contract, $115,000 budget",
+    "initial_claimed_discounts": {"aws": 0.25, "azure": 0.8152}
+  }'
+```
+
+### Or run one scenario from the CLI, without any servers
+
+```bash
+cd backend && source .venv/bin/activate
+python scripts/run_scenario.py --fixture flagship --approve
+```
+
+## Tests
+
+```bash
+cd backend && source .venv/bin/activate
+pytest tests/            # unit + integration (hits real AWS/Azure APIs) + e2e
+```
+
+Integration tests that spawn the vendor services as real subprocesses
+(`test_vendor_client_live.py`, `test_flagship_scenario_live.py`,
+`test_api.py`) take a few seconds longer than the rest — they're proving
+the system negotiates over genuine HTTP between separate processes, not
+asserting against in-process function calls.
+
+## Evaluation harness
+
+```bash
+cd backend && source .venv/bin/activate
+python scripts/run_catalogue.py
+```
+
+Runs every scenario in `eval/scenario_catalogue.yaml` through the exact
+same pipeline code path as a live negotiation, prints a results table,
+and writes real (not invented) aggregate statistics — agreement rate,
+average rounds-to-agreement, average savings, claim/compliance catch
+rates — to `eval/results.json`.
+
+## Current status / honest scope
+
+This build implements the PRD's Flagship Demonstration Scenario and the
+full negotiation pipeline end to end, verified against real external
+data. What's real right now:
+
+- Deterministic negotiation core, all 6 agents, both feedback loops
+- Real AWS pricing (Price List Bulk API) and real Azure pricing (Retail
+  Prices API, including real spot pricing) — no mocks, no fixtures, in
+  the live path
+- Genuinely separate vendor services negotiating over real HTTP
+- The human approval gate (nothing finalizes without it)
+- The evaluation harness, computing real statistics from real runs
+
+Not yet wired into the running system (see `docs/PRD.md` §11's Google
+Technology Stack table for the intended role of each):
+
+- **Gemini** — narration/parsing role designed and isolated from the
+  price-decision path (`pact/agents/negotiation_agent.py`,
+  `decision_agent.py`), not yet connected to a live API key
+- **Gemma** — pulled and running locally via Ollama, not yet wired into
+  the Verification Agent's pre-screening step
+- **BigQuery** — the negotiation log/event schema (`orchestration/state.py`)
+  is BigQuery-shaped and ready; the actual sink isn't connected yet
+- **GCP vendor**, **RunPod vendor** — scaffolded, no real pricing
+  integration yet
+- **Google ADK** — the 6 agents are structured as ADK would orchestrate
+  them, but the current pipeline (`orchestration/graph.py`) is a direct
+  Python implementation, not literally running through ADK
+- **Cloud Run deployment** — not yet deployed; everything above runs
+  locally
+
+Nothing in this list is faked to appear more complete than it is — see
+`docs/PRD.md` §32 for the project's explicit non-claims.
