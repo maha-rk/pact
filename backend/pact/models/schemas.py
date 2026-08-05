@@ -41,6 +41,7 @@ class AgentCard(BaseModel):
     name: str
     endpoint: str
     capabilities: list[str]
+    certifications: list[str] = Field(default_factory=list)
 
 
 class Offer(BaseModel):

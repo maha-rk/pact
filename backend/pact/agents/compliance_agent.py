@@ -8,7 +8,9 @@ from __future__ import annotations
 from pact.models.schemas import ComplianceResult, Offer, PolicyConstraints
 
 
-def check_compliance(offer: Offer, policy: PolicyConstraints) -> ComplianceResult:
+def check_compliance(
+    offer: Offer, policy: PolicyConstraints, vendor_certifications: list[str] | None = None
+) -> ComplianceResult:
     if offer.vendor_id in policy.blocked_vendors:
         return ComplianceResult(
             vendor_id=offer.vendor_id,
@@ -26,9 +28,19 @@ def check_compliance(offer: Offer, policy: PolicyConstraints) -> ComplianceResul
                 f"${policy.budget_ceiling_usd:,.2f}"
             ),
         )
+    if policy.required_certifications:
+        held = set(vendor_certifications or [])
+        missing = [c for c in policy.required_certifications if c not in held]
+        if missing:
+            return ComplianceResult(
+                vendor_id=offer.vendor_id,
+                constraint_name="required_certifications",
+                passed=False,
+                detail=f"{offer.vendor_id.value} is missing required certification(s): {', '.join(missing)}",
+            )
     return ComplianceResult(
         vendor_id=offer.vendor_id,
         constraint_name="all_constraints",
         passed=True,
-        detail="Deal satisfies the budget ceiling and vendor block-list constraints",
+        detail="Deal satisfies the budget ceiling, vendor block-list, and certification constraints",
     )

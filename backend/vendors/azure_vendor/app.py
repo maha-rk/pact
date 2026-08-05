@@ -19,6 +19,10 @@ AGENT_CARD = AgentCard(
     name="Azure Vendor Agent (Pact-operated)",
     endpoint="http://localhost:9002",
     capabilities=["negotiate", "quote"],
+    # Self-declared in the Agent Card, matching real-world Azure compliance
+    # documentation -- unlike pricing claims, certifications aren't
+    # independently re-verified against a live API in this build's scope.
+    certifications=["SOC2", "ISO27001"],
 )
 
 

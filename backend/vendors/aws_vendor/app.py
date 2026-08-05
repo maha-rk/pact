@@ -18,6 +18,10 @@ AGENT_CARD = AgentCard(
     name="AWS Vendor Agent (Pact-operated)",
     endpoint="http://localhost:9001",
     capabilities=["negotiate", "quote"],
+    # Self-declared in the Agent Card, matching real-world AWS compliance
+    # documentation -- unlike pricing claims, certifications aren't
+    # independently re-verified against a live API in this build's scope.
+    certifications=["SOC2", "ISO27001"],
 )
 
 

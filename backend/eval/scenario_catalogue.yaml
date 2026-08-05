@@ -1,0 +1,100 @@
+# Negotiation Scenario Catalogue (PRD §18) -- a representative slice of
+# the dimension space, not a full combinatorial sweep. Each scenario
+# defines its own vendor pricing (clearly synthetic/fixture data, the
+# same discipline as tests/fixtures.py -- never presented as a real live
+# quote) so budget tightness and outcome can be controlled deliberately.
+# Every scenario runs through the exact same pipeline code path as the
+# flagship run (pact.orchestration.graph.run_negotiation) -- no separate
+# "eval mode" logic (PRD §25).
+
+scenarios:
+  - id: budget-comfortable-honest
+    description: Budget comfortably above market rate; all vendors claim truthfully.
+    dimensions: {budget_tightness: comfortable, specificity: full, vendor_behavior: accurate, policy: budget_only, outcome: compliant}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 60000}
+    vendors:
+      aws: {list_price: 118886.40, real_discount: 0.0, claimed_discount: 0.0}
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.8152}
+
+  - id: budget-tight-honest
+    description: Budget at market rate; all vendors claim truthfully; a compliant deal is still reachable.
+    dimensions: {budget_tightness: tight, specificity: full, vendor_behavior: accurate, policy: budget_only, outcome: compliant}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 42000}
+    vendors:
+      aws: {list_price: 118886.40, real_discount: 0.0, claimed_discount: 0.0}
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.8152}
+
+  - id: budget-impossible
+    description: Budget below what any vendor can meet even honestly -- system must report this, not force a deal.
+    dimensions: {budget_tightness: impossible, specificity: full, vendor_behavior: accurate, policy: budget_only, outcome: no_deal}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 15000}
+    vendors:
+      aws: {list_price: 118886.40, real_discount: 0.0, claimed_discount: 0.0}
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.8152}
+
+  - id: flagship-claim-mismatch
+    description: The flagship scenario -- AWS claims a discount that cannot legitimately exist; Azure is honest and compliant.
+    dimensions: {budget_tightness: tight, specificity: full, vendor_behavior: mismatched, policy: budget_only, outcome: compliant}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 115000}
+    vendors:
+      aws: {list_price: 118886.40, real_discount: 0.0, claimed_discount: 0.25}
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.8152}
+
+  - id: both-vendors-mismatched
+    description: Both vendors overclaim their discount; both should be caught and corrected before any deal.
+    dimensions: {budget_tightness: tight, specificity: full, vendor_behavior: mismatched, policy: budget_only, outcome: compliant}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 115000}
+    vendors:
+      aws: {list_price: 118886.40, real_discount: 0.0, claimed_discount: 0.30}
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.95}
+
+  - id: blocked-vendor-cheapest
+    description: >
+      The only vendor that could ever be compliant (Azure, real price
+      $39,246) is on the policy block-list; AWS's honest price
+      ($118,886.40) still exceeds this budget on its own. Correctly
+      expects no_deal, not a forced fallback to a non-compliant vendor.
+    dimensions: {budget_tightness: tight, specificity: full, vendor_behavior: accurate, policy: blocked_vendor, outcome: no_deal}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 115000}
+    blocked_vendors: [azure]
+    vendors:
+      aws: {list_price: 118886.40, real_discount: 0.0, claimed_discount: 0.0}
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.8152}
+
+  - id: single-vendor-only
+    description: Only one vendor is discoverable this run -- system must still work correctly, not assume a minimum vendor count.
+    dimensions: {budget_tightness: comfortable, specificity: full, vendor_behavior: accurate, policy: budget_only, outcome: compliant}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 50000}
+    vendors:
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.8152}
+
+  - id: all-vendors-overpriced
+    description: Every vendor's honest price exceeds budget -- no compliant deal exists, reported honestly (PRD §27).
+    dimensions: {budget_tightness: impossible, specificity: full, vendor_behavior: accurate, policy: budget_only, outcome: no_deal}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 30000}
+    vendors:
+      aws: {list_price: 118886.40, real_discount: 0.0, claimed_discount: 0.0}
+
+  - id: small-request-comfortable
+    description: A smaller, cheaper request (1 GPU) with a comfortable budget -- system should generalize beyond the 8-GPU flagship spec.
+    dimensions: {budget_tightness: comfortable, specificity: full, vendor_behavior: accurate, policy: budget_only, outcome: compliant}
+    requirement: {gpu_count: 1, contract_months: 3, budget_ceiling_usd: 8000}
+    vendors:
+      aws: {list_price: 14860.80, real_discount: 0.0, claimed_discount: 0.0}
+      azure: {list_price: 26546.40, real_discount: 0.8152, claimed_discount: 0.8152}
+
+  - id: certification-required-and-met
+    description: A certification both vendors actually hold is required -- compliance passes normally.
+    dimensions: {budget_tightness: comfortable, specificity: full, vendor_behavior: accurate, policy: certification, outcome: compliant}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 50000}
+    required_certifications: [SOC2]
+    vendors:
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.8152}
+
+  - id: certification-required-and-unmet
+    description: A certification neither vendor holds is required -- the compliance gate must reject on that grounds specifically, not silently pass an unmodeled constraint.
+    dimensions: {budget_tightness: comfortable, specificity: full, vendor_behavior: accurate, policy: certification, outcome: no_deal}
+    requirement: {gpu_count: 8, contract_months: 3, budget_ceiling_usd: 50000}
+    required_certifications: [FedRAMP-High]
+    vendors:
+      azure: {list_price: 212371.20, real_discount: 0.8152, claimed_discount: 0.8152}

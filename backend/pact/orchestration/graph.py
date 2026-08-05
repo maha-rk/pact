@@ -156,7 +156,8 @@ def run_negotiation(
         # --- Compliance gate: verified, price-acceptable offers only (FR-6) ---
         round_compliant: list[tuple[Offer, object, object]] = []
         for offer, verification in round_price_acceptable:
-            compliance = compliance_agent.check_compliance(offer, policy)
+            vendor_certs = agent_cards[offer.vendor_id].certifications
+            compliance = compliance_agent.check_compliance(offer, policy, vendor_certifications=vendor_certs)
             state.compliance_results.append(compliance)
             if compliance.passed:
                 state.log(
