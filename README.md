@@ -1,6 +1,5 @@
 <p align="center">
-  <!-- TODO: add a hero screenshot before submission, e.g.: -->
-  <!-- <img src="docs/screenshots/hero.png" alt="Pact — autonomous B2B procurement negotiation" width="100%" /> -->
+  <img src="docs/screenshots/hero.png" alt="Pact — Decision / Evidence / Reasoning view showing Azure selected at $39,246.20 with cited evidence" width="100%" />
 </p>
 
 <h1 align="center">Pact</h1>
@@ -14,6 +13,7 @@
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" />
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
+  <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
   <img alt="Tests" src="https://img.shields.io/badge/tests-44-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
@@ -163,10 +163,15 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 | Time | Do this | What it proves |
 |---:|---|---|
 | 0:00–0:30 | State the flagship requirement — type it, or use **📷 Upload a photo** / **🎙️ Speak your requirement** | Real, honest input — nothing pre-canned in the negotiation itself |
-| 0:30–0:45 | Click **Start negotiation** | Completes in well under a second — real HTTP round-trips against live vendor services, not a scripted delay |
-| 0:45–1:30 | Open the **Decision** tab | Azure selected at $39,246.20, with evidence items each citing a real source |
+| 0:30–0:50 | Click **Start negotiation** | Completes in under 20 seconds — 6 real rounds over real HTTP, a real Gemma pre-screen on every claim, and real Gemini narration of the final decision; the deterministic negotiation math itself is near-instant, the wait is the real model calls, not a scripted delay |
+| 0:50–1:30 | Open the **Decision** tab | Azure selected at $39,246.20, with evidence items each citing a real source |
 | 1:30–2:30 | Switch to the **Negotiation Replay** tab | The full event timeline — AWS's claim rejected, AWS's corrected offer rejected on compliance, Azure verified and selected |
 | 2:30–3:00 | Enter a name and click **Approve deal** | The negotiation finalizes only now — see [Safety by Design](#safety-by-design) |
+
+<p align="center">
+  <img src="docs/screenshots/decision-view.png" alt="Decision / Evidence / Reasoning tab" width="49%" />
+  <img src="docs/screenshots/replay-timeline.png" alt="Negotiation Replay tab" width="49%" />
+</p>
 
 ---
 
@@ -359,13 +364,15 @@ cd backend && source .venv/bin/activate
 python -m pact.mcp_tools.server   # speaks real MCP over stdio; connect any MCP client
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 | Variable | Where | Required | Description |
 |---|---|---|---|
 | `GEMINI_API_KEY` | `backend/.env` | Optional (recommended) | Enables Gemini narration and photo/voice requirement intake (FR-1). Falls back to a deterministic reasoning template if absent — never blocks a negotiation. |
 
 ## Security
+
+Full policy: [SECURITY.md](SECURITY.md).
 
 - **No payment or card information is required anywhere.** The
   deployment path (Docker + ngrok, see [Deployment](#deployment)) was

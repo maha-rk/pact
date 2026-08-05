@@ -8,11 +8,17 @@ field genuinely absent from the input comes back null, not guessed."""
 from __future__ import annotations
 
 import io
+import os
 
 import pytest
 from PIL import Image, ImageDraw
 
 from pact.models.requirement_parser import parse_requirement_from_image, parse_requirement_from_text
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("GEMINI_API_KEY"),
+    reason="requires a real GEMINI_API_KEY (FR-1 has no local-fallback path to test against)",
+)
 
 
 def _render_invoice_png(lines: list[str]) -> bytes:
