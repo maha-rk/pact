@@ -321,6 +321,27 @@ with actual prospective customers of this specific product.*
 
 ---
 
+## 13a. Requirements Traceability Matrix
+
+Maps each functional requirement directly to the architecture node and
+codebase location that owns it — added specifically so a reviewer can
+verify a requirement is actually implemented rather than only described.
+
+| ID | Owning agent / component | Codebase location |
+|---|---|---|
+| FR-1 | Buyer Agent (intake) + Gemini Vision | `pact/models/requirement_parser.py`, `pact/api/routes_requirements.py` |
+| FR-2 | Discovery Agent | `pact/agents/discovery_agent.py` |
+| FR-3 | Negotiation Agent | `pact/orchestration/graph.py` (`run_negotiation_and_decision_phase`) |
+| FR-4 | Negotiation core (deterministic) | `pact/negotiation/concession.py` |
+| FR-5 | Verification Agent | `pact/agents/verification_agent.py`, `pact/mcp_tools/verification_tool.py` |
+| FR-6 | Compliance Agent | `pact/agents/compliance_agent.py` |
+| FR-7 | Decision Agent | `pact/agents/decision_agent.py`, `pact/models/gemini_client.py` |
+| FR-8 | Approval gate | `pact/orchestration/approval.py` (the only function permitted to finalize) |
+| FR-9 | Logging | `pact/logging/bigquery_sink.py` |
+| FR-10 | Replay UI | `frontend/src/components/ReplayTimeline.tsx` |
+
+---
+
 ## 14. Non-Functional Requirements
 
 | Attribute | Requirement | Acceptance Criteria |
@@ -365,6 +386,35 @@ negotiation strategy for this category of purchase — reasoned from
 standard negotiation theory, not validated against real negotiated
 outcomes in this specific market, since no real negotiation history for
 this product exists yet.*
+
+---
+
+## 16a. Prompt Engineering Framework (CRISPE)
+
+Every prompt sent to Gemini is structured against the CRISPE framework
+(Capacity/Role, Insight, Statement, Personality, Experiment) rather than
+written ad hoc — both of Pact's real Gemini call sites already follow
+this shape; this section names it explicitly rather than introducing new
+prompt text.
+
+| CRISPE element | Decision narration (`gemini_client.py`) | Requirement intake (`requirement_parser.py`) |
+|---|---|---|
+| **C**apacity/Role | "You are the Decision Agent in an autonomous B2B procurement negotiation system." | An extraction-only role: "You extract structured procurement requirement fields from the input." |
+| **I**nsight (context) | The already-computed, verified facts: selected vendor, final price, evidence lines. | The user's actual photo or transcript — nothing else. |
+| **S**tatement (task) | "Write a concise (2-3 sentence) professional reasoning statement explaining why this vendor was selected, referencing ONLY the facts given below." | "Return ONLY fields whose value is actually present or directly stated in the input." |
+| **P**ersonality (constraints) | "Do not invent any number, percentage, or claim not listed here. Do not use markdown formatting." | "NEVER guess, estimate, or invent a plausible-looking value" — nulls are required, not optional, for absent fields. |
+| **E**xperiment (output control) | Free text, capped by a 10s timeout with one retry; falls back to a deterministic template on failure (§27). | Strict JSON via `response_json_schema` — a fixed schema, not free-form generation. |
+
+The common invariant across both: the model is given facts already
+computed or literally present in the input and constrained to restate or
+extract them, never to originate a number, price, or verdict — the same
+boundary FR-4 and FR-5 enforce at the architecture level, applied here at
+the prompt level.
+
+**Guardrail layer**: prompt injection and PII exposure risk on the
+free-text/photo/voice intake path (FR-1 is the only place raw,
+unstructured user input reaches an LLM) is addressed via Enkrypt AI —
+see §23a.
 
 ---
 
@@ -585,6 +635,72 @@ data warehouse, all deployed on Cloud Run.
 
 ---
 
+## 23a. Security & API Gateway Architecture
+
+Pact's current build is a single-operator system (one deployment, no
+multi-tenant customer accounts yet), so several of the controls below are
+documented as the target design for a production, multi-tenant version
+rather than something a single-operator demo needs today — each is
+labeled accordingly.
+
+- **API Gateway** (target design): a single ingress point in front of
+  `pact-core` and the vendor services, terminating TLS and applying rate
+  limiting before a request reaches application code, rather than each
+  service handling this independently.
+- **Authentication** (target design): OAuth2/JWT-based authentication for
+  any future multi-tenant deployment. The current build has no end-user
+  accounts to authenticate — its access boundary today is CORS restricted
+  to the known local frontend origins, documented honestly as narrower
+  than production auth, not a placeholder pretending to be one.
+- **Rate limiting** (target design): per-client request limits at the
+  gateway, to bound both cost (external API calls) and abuse, once the
+  system is exposed beyond a single operator's own demo traffic.
+- **Encryption**: TLS in transit is already real for every external
+  call this build makes (AWS Price List Bulk API, Azure Retail Prices
+  API, Gemini API, BigQuery) — all are HTTPS-only endpoints. At-rest
+  encryption for BigQuery-stored negotiation logs relies on BigQuery's
+  own default encryption at rest; no additional application-level
+  encryption is implemented or claimed.
+- **LLM-specific guardrails (Enkrypt AI)**: FR-1's photo/voice/text
+  requirement intake (`pact/models/requirement_parser.py`) is the one
+  place in the system where raw, unstructured user input reaches an LLM
+  before any deterministic validation — the natural target for prompt
+  injection and PII exposure. Enkrypt AI's guardrail API is the intended
+  layer for this: prompt injection detection on the input before it
+  reaches Gemini, and PII detection/redaction before anything derived
+  from user input is written to BigQuery (§25). See §32 for current
+  implementation status of this layer specifically.
+
+---
+
+## 23b. LLM Observability & Tracing
+
+Every real Gemini/Gemma call in the system (`gemini_client.py`,
+`gemma_client.py`, `requirement_parser.py`) is already tagged in the
+negotiation event log with which agent invoked it, the round number where
+applicable, and the outcome (`narration_degraded` on failure,
+`plausibility_screened` per Gemma call) — this is real today, not
+aspirational. The target design extends this into full request-level
+tracing:
+
+- **Correlation IDs**: each model call tagged with the owning
+  `negotiation_id`, so every Gemini/Gemma invocation for a given run can
+  be reconstructed end to end.
+- **Per-call metrics**: token usage, latency, and model version logged
+  alongside the existing negotiation log in BigQuery, enabling the
+  evaluation harness (§29) to report on model cost/latency, not just
+  negotiation outcomes.
+- **Prompt hashes, not raw prompts**: a hash of the prompt template is
+  logged for reproducibility auditing, rather than the raw prompt text
+  itself — the raw text is either a fixed template (narration) or
+  user-supplied input (intake), and logging the latter verbatim would
+  conflict with §23a's PII handling.
+
+This section documents the design; full OpenTelemetry-style
+instrumentation is not yet implemented — see §32.
+
+---
+
 ## 24. API and Communication Requirements
 
 - **A2A** is the transport for all negotiation messages between the
@@ -609,6 +725,11 @@ content is business pricing/requirement data, not personal data.
 ---
 
 ## 26. Security, Privacy and Compliance Boundaries
+
+See §23a for the API Gateway / authentication / LLM-guardrail
+architecture (target design plus current real boundary) and §23b for the
+LLM observability design this section's credential-handling claim below
+is scoped against.
 
 - Vendor pricing data consumed is public by construction (public pricing
   APIs); no private or credentialed vendor data is accessed.
@@ -724,6 +845,24 @@ content is business pricing/requirement data, not personal data.
   Vendor Agents used in this build — they are independently implemented
   by the Pact team as separate A2A services wrapping each provider's real
   public pricing data (§17).
+- Does not claim the §23a/§23b security and observability architecture is
+  fully implemented — the API Gateway, OAuth2/JWT auth, rate limiting,
+  and full OpenTelemetry-style tracing are documented target designs for
+  a multi-tenant production version; today's real access boundary is
+  CORS restriction (§26), and today's real observability is the
+  event-level tagging already in the negotiation log, not full
+  request-level tracing.
+- Does not claim Enkrypt AI is wired into the running system yet — it is
+  the intended guardrail layer for FR-1's LLM-facing intake path (§23a),
+  evaluated and confirmed to offer a genuine no-card free tier, but not
+  yet integrated as of this PRD revision.
+- **Qdrant, evaluated and not adopted**: considered for semantic
+  vendor-capability matching. Not adopted because no genuine use case
+  exists at the current build's scale — vendor discovery is structured
+  A2A Agent Card matching (§17) and pricing verification is structured
+  API lookup (§16), neither of which benefits from vector search.
+  Documented here explicitly rather than silently omitted, so this reads
+  as a considered decision, not an oversight.
 
 ---
 
@@ -783,6 +922,18 @@ throughout this document, consolidated in one place:
   point underlying the concession function.
 - **Concession curve** — the deterministic function governing how far the
   Negotiation Agent moves off its opening offer over successive rounds.
+- **CRISPE** — a prompt-structuring framework (Capacity/Role, Insight,
+  Statement, Personality, Experiment) used to document Pact's real Gemini
+  prompts (§16a) explicitly rather than leaving prompt design implicit.
+- **API Gateway** — a single ingress point for external-facing traffic
+  handling auth, rate limiting, and TLS termination; documented as target
+  design for a multi-tenant version (§23a), not yet built for this
+  single-operator demo.
+- **Enkrypt AI** — a third-party LLM guardrail service (prompt injection
+  detection, PII detection/redaction) identified as the intended
+  protection layer for FR-1's LLM-facing intake path (§23a).
+- **OpenTelemetry** — an open observability standard referenced as the
+  target format for the request-level LLM tracing described in §23b.
 
 ---
 

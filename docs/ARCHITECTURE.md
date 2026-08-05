@@ -17,17 +17,24 @@ externally, what comes out.
 
 ```mermaid
 flowchart LR
-    USER["User<br/>voice or photo"] --> ORCH["Pact<br/>Agent Orchestration<br/>(Google ADK)"]
+    USER["User<br/>voice or photo"] --> GATEWAY["API Gateway +<br/>Enkrypt AI Guardrails<br/>target design, not yet built — PRD §23a"]
+    GATEWAY --> ORCH["Pact<br/>Agent Orchestration<br/>(Google ADK)"]
     ORCH <-->|A2A Protocol<br/>live negotiation| VENDORS["Independent Vendor Agents<br/>AWS · Azure · GCP · RunPod"]
     ORCH --> DECISION["Final Decision<br/>Evidence + Reasoning<br/>no fabricated scores"]
     ORCH -.->|deployed on| INFRA["Cloud Run · BigQuery · Vertex AI"]
+
+    classDef planned stroke-dasharray: 5 5,fill:#fff3cd,stroke:#997404,color:#000
+    class GATEWAY planned
 ```
 
 **Read this as**: a user states a real requirement once. Everything else —
 finding vendors, negotiating with several of them at once, verifying their
 claims, enforcing policy, and deciding — happens autonomously inside Pact's
 agent orchestration layer, with A2A as the actual channel Pact uses to
-transact with vendors that are not part of the same system.
+transact with vendors that are not part of the same system. The dashed
+Gateway node is the one piece of this diagram that isn't running today —
+today's real access boundary is CORS restriction (PRD §26); everything
+else here is live.
 
 ---
 
@@ -146,10 +153,17 @@ flowchart TB
         VERTEXAI["Vertex AI<br/>Gemini serving backbone"]
     end
 
+    OTEL["OpenTelemetry tracing<br/>token usage · latency · prompt hashes<br/>target design, not yet built — PRD §23b"]
+
     GEMINI --> VERTEXAI
     MCP -.->|used by Discovery,<br/>Negotiation, Verification agents| MODELS
     MODELS --> CLOUDRUN
     BIGQUERY --> CLOUDRUN
+    MODELS -.-> OTEL
+    OTEL -.-> BIGQUERY
+
+    classDef planned stroke-dasharray: 5 5,fill:#fff3cd,stroke:#997404,color:#000
+    class OTEL planned
 ```
 
 **Why Gemini and Gemma are both here, doing different jobs**: Gemma runs
@@ -205,3 +219,12 @@ ways, not two separately maintained sources of truth.
   Negotiation Agent is willing to move off its opening offer over
   successive rounds, based on time/urgency and the vendor's own behavior.
   This is what keeps negotiation *real* math, not an LLM inventing numbers.
+- **API Gateway** (dashed nodes above) — the target single ingress point
+  for a multi-tenant production version (auth, rate limiting, TLS
+  termination); not yet built for this single-operator build (PRD §23a).
+- **Enkrypt AI** — the intended LLM guardrail service (prompt injection
+  detection, PII detection/redaction) for FR-1's LLM-facing intake path,
+  the one place raw user input reaches a model before validation.
+- **CRISPE** — the prompt-structuring framework (Capacity/Role, Insight,
+  Statement, Personality, Experiment) both of Pact's real Gemini prompts
+  are documented against (PRD §16a).
