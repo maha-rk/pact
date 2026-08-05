@@ -1,19 +1,147 @@
 # Pact
 
-Autonomous B2B procurement negotiation. A Buyer Agent negotiates
-simultaneously with independent Vendor Agents over real HTTP, verifies
-every vendor claim against real, live pricing data, enforces policy as a
-hard gate, and produces an evidence-backed decision for human approval —
-nothing is fabricated, and nothing is finalized without an explicit
-approval action.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Node](https://img.shields.io/badge/node-18%2B-339933)
+![Tests](https://img.shields.io/badge/tests-44-brightgreen)
+![Built for](https://img.shields.io/badge/Built%20for-AI%20Agent%20Builder%20Series%202026-8A2BE2)
+
+**Pact is a trustworthy autonomous procurement system where organizational
+agents negotiate directly with other organizational agents, every claim is
+independently verified, every decision is auditable, and every
+recommendation is grounded in real evidence rather than a fabricated
+score.**
+
+A Buyer Agent negotiates simultaneously with independent Vendor Agents
+over real HTTP, verifies every vendor claim against real, live pricing
+data, enforces policy as a hard gate, and produces an evidence-backed
+decision — nothing is fabricated, and nothing is finalized without
+explicit human approval.
 
 Full product and architecture documentation: [`docs/PRD.md`](docs/PRD.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Why this exists
+
+Procurement teams with recurring vendor spend already run this process —
+manually. A human reads vendor quotes, tries to negotiate against several
+suppliers at once (in practice, rarely at the same time), and has no
+practical way to check whether a vendor's "discount" claim is real before
+signing. Tools like SAP Ariba and Coupa digitize the paperwork around that
+decision; a person still reads it and makes the call.
+
+Pact moves the negotiation and claim-verification steps themselves into
+an autonomous system — a human is retained only at the final approval
+boundary, not at every step in between. In its flagship scenario (8×
+H100 GPUs, 3-month contract, $115,000 budget), Pact negotiated with AWS
+and Azure simultaneously over real HTTP, caught AWS's claimed discount as
+fabricated against AWS's own real pricing data, rejected AWS's corrected
+offer anyway for exceeding budget, and closed a real, verified, compliant
+deal with Azure at **$39,246.20 — roughly 66% under the budget ceiling** —
+with every one of those numbers traceable to a live public pricing API,
+not invented. See [Evidence](#evidence-the-flagship-scenario) below.
 
 ## Screenshots
 
 <!-- TODO: add screenshots before submission -->
 <!-- Decision / Evidence / Reasoning view: ![Decision view](docs/screenshots/decision-view.png) -->
 <!-- Negotiation Replay timeline: ![Replay timeline](docs/screenshots/replay-timeline.png) -->
+
+## What makes Pact different
+
+1. **Agents negotiate with agents, over a real transport.** The Buyer
+   Agent and each Vendor Agent are genuinely separate HTTP services, not
+   one application pretending to be several.
+2. **Vendor claims are never trusted at face value.** Every claim is
+   independently checked against a real, live external source before it
+   can affect the outcome — a mismatch triggers renegotiation, not a
+   silently accepted number.
+3. **Policy can override price.** Even the cheapest verified offer is
+   rejected if it violates an explicit constraint (budget, blocked
+   vendor, missing certification), forcing renegotiation.
+4. **Every recommendation carries evidence, never a bare score.** The
+   final output is always Decision + Evidence + Reasoning, with each
+   evidence item traceable to a real source.
+5. **Pact measures itself with real numbers.** The evaluation harness
+   runs a real scenario catalogue through the same pipeline as a live
+   negotiation and computes real aggregate statistics via SQL — no
+   claimed savings figure that isn't backed by a logged, re-runnable run.
+
+## How it works
+
+```mermaid
+flowchart LR
+    USER["User<br/>typed, photo, or voice input"] --> CORE["Pact Core<br/>6-agent pipeline<br/>orchestrated via Google ADK"]
+    CORE <-->|real HTTP negotiation| AWS["AWS Vendor Agent<br/>real AWS Price List API"]
+    CORE <-->|real HTTP negotiation| AZURE["Azure Vendor Agent<br/>real Azure Retail Prices API"]
+    CORE -.->|scaffolded, not yet live| OTHER["GCP / RunPod<br/>Vendor Agents"]
+    CORE --> DECISION["Decision + Evidence + Reasoning<br/>held for human approval"]
+```
+
+The six agents (Buyer, Discovery, Negotiation, Verification, Compliance,
+Decision) and the full request/response sequence, including both
+feedback loops, are diagrammed in detail in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The sequence below is the
+flagship scenario specifically, with only the two vendors that are
+genuinely wired to live pricing data today:
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant N as Negotiation Agent
+    participant AWS as AWS Vendor Agent
+    participant AZ as Azure Vendor Agent
+    participant V as Verification Agent
+    participant C as Compliance Agent
+    participant D as Decision Agent
+
+    U->>N: 8x H100 GPUs, 3-month contract, $115,000 budget
+
+    par Simultaneous negotiation over real HTTP
+        N->>AWS: opening offer
+        AWS-->>N: counter-offer, claims 25% committed-use discount
+    and
+        N->>AZ: opening offer
+        AZ-->>N: counter-offer, claims 81.52% spot discount
+    end
+
+    N->>V: verify AWS's claimed discount against real AWS pricing data
+    V-->>N: no such discount tier exists under 12 months — claim rejected
+    N->>AWS: challenge, renegotiate
+    AWS-->>N: corrected offer at the real, undiscounted rate
+
+    N->>V: verify Azure's claimed discount against real Azure pricing data
+    V-->>N: matches real, live Spot pricing — verified
+
+    N->>C: check both verified offers against budget policy
+    C-->>N: AWS's corrected offer exceeds the $115,000 ceiling — rejected
+    C-->>N: Azure's offer is compliant
+
+    N->>D: Azure selected — verified, compliant, lowest real price
+    D-->>U: Decision + Evidence + Reasoning, pending approval
+```
+
+## Evidence: the flagship scenario
+
+Every figure below is fetched live from a public pricing API or computed
+directly from it — reproduce it yourself with
+`python scripts/run_scenario.py --fixture flagship --approve` (see
+[Running it](#running-it)).
+
+**Claim verification**
+
+| Vendor | Claimed | Checked against | Real value | Verdict |
+|---|---|---|---|---|
+| AWS | 25% committed-use discount, 3-month term | AWS Price List Bulk API | 0% — AWS's real Reserved Instance terms are 1-year and 3-year only; no 3-month tier exists | ❌ Rejected, renegotiated |
+| Azure | 81.52% discount via Spot pricing | Azure Retail Prices API (live) | 81.52% — real, immediately-available Spot pricing, no minimum commitment | ✅ Verified |
+
+**Final decision**
+
+| | AWS (corrected) | Azure (selected) |
+|---|---|---|
+| Real 3-month price | $118,886.40 | $39,246.20 |
+| Verified against real data | ✅ | ✅ |
+| Within $115,000 budget | ❌ | ✅ |
+| Outcome | Rejected on compliance grounds | Selected, pending human approval |
 
 ## Contents
 
@@ -39,7 +167,7 @@ backend/
     mcp_tools/            pricing_lookup / verify_claim: core logic + a real MCP server exposing both as MCP tools
     adk/                   Real Google ADK orchestration of the pipeline (SequentialAgent + Runner)
     a2a/                  HTTP-based vendor transport (see note below)
-    models/               Shared data schemas
+    models/               Shared data schemas + Gemini Vision requirement parser
     api/                  FastAPI routes (pact-core)
     main.py               pact-core entrypoint
   vendors/
@@ -57,7 +185,7 @@ infra/                    bigquery/ (schema + aggregate query), huggingface/ (de
 
 - Python 3.11+
 - Node 18+
-- [Ollama](https://ollama.com) running the `gemma3:4b` model — optional; without it, verification still runs correctly (the deterministic check is authoritative either way), it just skips the extra Gemma plausibility pre-screen (see Current Status below)
+- [Ollama](https://ollama.com) running the `gemma3:4b` model — optional; without it, verification still runs correctly (the deterministic check is authoritative either way), it just skips the extra Gemma plausibility pre-screen (see [Current status](#current-status--honest-scope))
 
 ## Setup
 
@@ -88,7 +216,8 @@ strictly narration, never determining a price, a verification verdict, or
 a compliance verdict. If the Gemini call fails or times out for any
 reason, the system falls back to the deterministic template automatically
 and logs a `narration_degraded` event rather than blocking the decision
-(PRD §27).
+(PRD §27). The same key also powers the photo/voice requirement intake
+(FR-1) described below.
 
 ## Running it
 
@@ -176,6 +305,9 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 
 ## Current status / honest scope
 
+<details>
+<summary>Full breakdown of what's genuinely live versus not (click to expand)</summary>
+
 This build implements the PRD's Flagship Demonstration Scenario and the
 full negotiation pipeline end to end, verified against real external
 data. What's real right now:
@@ -196,7 +328,7 @@ data. What's real right now:
   development
 - **Gemma** — real, self-hosted (local Ollama) plausibility pre-screen on
   every vendor claim (`pact/models/gemma_client.py`), logged as its own
-  `plausibility_screened` event -- explicitly independent of, and never
+  `plausibility_screened` event — explicitly independent of, and never
   authoritative over, the deterministic verification verdict that
   actually gates the negotiation (FR-4's reproducibility guarantee is
   preserved: an LLM never decides match/mismatch)
@@ -266,6 +398,8 @@ Technology Stack table for the intended role of each):
 
 Nothing in this list is faked to appear more complete than it is — see
 `docs/PRD.md` §32 for the project's explicit non-claims.
+
+</details>
 
 ## Deployment
 
