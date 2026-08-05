@@ -4,12 +4,13 @@ and render two projections of the same record."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 import os
 
 from pact.a2a.vendor_client import HttpVendorClient
+from pact.logging import bigquery_sink
 from pact.models.schemas import AgentCard, PolicyConstraints, Requirement, VendorId
 from pact.orchestration import approval
 from pact.orchestration.graph import run_negotiation
@@ -80,8 +81,23 @@ def _narrator():
     return narrate_reasoning
 
 
+def _plausibility_screener():
+    """Real Gemma pre-screen if the local Ollama instance is reachable;
+    None otherwise -- verification's deterministic verdict never depends
+    on this (PRD §27)."""
+    import httpx
+
+    try:
+        httpx.get("http://localhost:11434/api/tags", timeout=1.0).raise_for_status()
+    except Exception:
+        return None
+    from pact.models.gemma_client import plausibility_screen
+
+    return plausibility_screen
+
+
 @router.post("", response_model=NegotiationState)
-def create_negotiation(req: NegotiationRequest) -> NegotiationState:
+def create_negotiation(req: NegotiationRequest, background_tasks: BackgroundTasks) -> NegotiationState:
     requirement = Requirement(
         gpu_type=req.gpu_type,
         gpu_count=req.gpu_count,
@@ -106,8 +122,12 @@ def create_negotiation(req: NegotiationRequest) -> NegotiationState:
         initial_claimed_discounts=req.initial_claimed_discounts,
         vendor_client=HttpVendorClient(VENDOR_ENDPOINTS),
         narrator=_narrator(),
+        plausibility_screener=_plausibility_screener(),
     )
     _STORE[state.negotiation_id] = state
+    # BigQuery load jobs take real seconds -- never hold the API response on
+    # them (PRD §27's discipline applied to latency, not just correctness).
+    background_tasks.add_task(bigquery_sink.write_negotiation, state)
     return state
 
 
@@ -120,13 +140,14 @@ def get_negotiation(negotiation_id: str) -> NegotiationState:
 
 
 @router.post("/{negotiation_id}/approve", response_model=NegotiationState)
-def approve_negotiation(negotiation_id: str, req: ApprovalRequest) -> NegotiationState:
+def approve_negotiation(negotiation_id: str, req: ApprovalRequest, background_tasks: BackgroundTasks) -> NegotiationState:
     state = _STORE.get(negotiation_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Negotiation not found")
     if state.status != NegotiationStatus.AGREED_PENDING_APPROVAL:
         raise HTTPException(status_code=409, detail=f"Cannot approve a negotiation in status {state.status.value}")
     approval.approve(state, approved_by=req.approved_by)
+    background_tasks.add_task(bigquery_sink.write_negotiation, state)  # re-sync: records the approval too
     return state
 
 

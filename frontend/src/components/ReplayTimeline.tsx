@@ -18,6 +18,8 @@ const EVENT_LABELS: Record<string, string> = {
   decision_approved: "Decision approved",
   no_compliant_deal: "No compliant deal",
   vendor_unavailable: "Vendor unavailable",
+  narration_degraded: "Narration degraded (Gemini)",
+  plausibility_screened: "Plausibility pre-screen (Gemma)",
 };
 
 const EVENT_CLASS: Record<string, string> = {
@@ -25,10 +27,12 @@ const EVENT_CLASS: Record<string, string> = {
   compliance_rejected: "event-negative",
   no_compliant_deal: "event-negative",
   vendor_unavailable: "event-negative",
+  narration_degraded: "event-negative",
   claim_verified: "event-positive",
   compliance_passed: "event-positive",
   decision_produced: "event-highlight",
   decision_approved: "event-highlight",
+  plausibility_screened: "event-muted",
 };
 
 function formatTime(ts: string): string {

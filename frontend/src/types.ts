@@ -72,7 +72,9 @@ export type EventType =
   | "decision_produced"
   | "decision_approved"
   | "no_compliant_deal"
-  | "vendor_unavailable";
+  | "vendor_unavailable"
+  | "narration_degraded"
+  | "plausibility_screened";
 
 export interface NegotiationEvent {
   event_type: EventType;

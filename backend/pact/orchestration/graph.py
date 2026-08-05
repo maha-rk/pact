@@ -13,6 +13,7 @@ from pact.a2a.vendor_client import HttpVendorClient, VendorUnavailableError
 from pact.agents import compliance_agent, decision_agent, discovery_agent, verification_agent
 from pact.agents.negotiation_agent import buyer_offer_at_round, vendor_offer_at_round
 from pact.mcp_tools.pricing_tool import PricingSource
+from pact.mcp_tools.verification_tool import PlausibilityScreener
 from pact.models.schemas import AgentCard, Offer, PolicyConstraints, Requirement, VendorId
 from pact.orchestration.state import EventType, NegotiationState, NegotiationStatus
 
@@ -36,6 +37,7 @@ def run_negotiation(
     max_rounds: int = DEFAULT_MAX_ROUNDS,
     vendor_client: HttpVendorClient | None = None,
     narrator: decision_agent.Narrator | None = None,
+    plausibility_screener: PlausibilityScreener | None = None,
 ) -> NegotiationState:
     """If `vendor_client` is provided, each round's vendor offer is
     fetched over real HTTP from that vendor's genuinely separate service
@@ -122,8 +124,17 @@ def run_negotiation(
             )
 
             # --- Verification gate: every claim checked, every round (FR-5) ---
-            result = verification_agent.verify(offer, requirement, pricing_source)
+            result = verification_agent.verify(
+                offer, requirement, pricing_source, plausibility_screener=plausibility_screener
+            )
             state.verification_results.append(result)
+            if result.plausibility_screen:
+                state.log(
+                    EventType.PLAUSIBILITY_SCREENED,
+                    vendor_id=vendor_id,
+                    round_number=round_number,
+                    detail=f"Gemma (self-hosted, independent of the deterministic verdict): {result.plausibility_screen}",
+                )
             if result.matched:
                 state.log(
                     EventType.CLAIM_VERIFIED,

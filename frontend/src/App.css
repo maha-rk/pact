@@ -275,3 +275,12 @@ button:disabled {
 .event-highlight .timeline-label {
   color: var(--accent);
 }
+
+.event-muted {
+  opacity: 0.65;
+}
+
+.event-muted .timeline-label {
+  font-style: italic;
+  font-weight: 500;
+}

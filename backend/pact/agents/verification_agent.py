@@ -8,9 +8,14 @@ decision itself always happens here, deterministically."""
 from __future__ import annotations
 
 from pact.mcp_tools.pricing_tool import PricingSource
-from pact.mcp_tools.verification_tool import verify_claim
+from pact.mcp_tools.verification_tool import PlausibilityScreener, verify_claim
 from pact.models.schemas import Offer, Requirement, VerificationResult
 
 
-def verify(offer: Offer, requirement: Requirement, pricing_source: PricingSource) -> VerificationResult:
-    return verify_claim(offer, requirement, pricing_source)
+def verify(
+    offer: Offer,
+    requirement: Requirement,
+    pricing_source: PricingSource,
+    plausibility_screener: PlausibilityScreener | None = None,
+) -> VerificationResult:
+    return verify_claim(offer, requirement, pricing_source, plausibility_screener=plausibility_screener)

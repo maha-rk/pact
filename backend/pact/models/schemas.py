@@ -60,7 +60,11 @@ class Offer(BaseModel):
 
 
 class VerificationResult(BaseModel):
-    """Result of checking one vendor claim against real external data."""
+    """Result of checking one vendor claim against real external data.
+    `matched` is always a deterministic numeric comparison -- an LLM never
+    decides this verdict (FR-4's reproducibility guarantee extends here).
+    `plausibility_screen` is Gemma's independent, best-effort fast take,
+    logged for observability -- never authoritative (PRD §16)."""
 
     vendor_id: VendorId
     claim_checked: str
@@ -68,6 +72,7 @@ class VerificationResult(BaseModel):
     actual_value: float
     source: str = Field(description="Where the real value came from, e.g. 'AWS Price List Bulk API'")
     matched: bool
+    plausibility_screen: str | None = None
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

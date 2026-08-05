@@ -4,10 +4,11 @@ scenario in eval/scenario_catalogue.yaml through the exact same pipeline
 code path as the flagship run -- no separate "eval mode" -- and computes
 real aggregate statistics from the actual results.
 
-Writes eval/results.json locally for now. Once a GCP project exists, this
-sinks to BigQuery instead (same schema, same computation), per the build
-plan -- this local file is a documented interim step, not a permanent
-substitute (PRD §25 names BigQuery as the authoritative store).
+Writes eval/results.json locally (for the printed summary table) AND
+sinks every scenario run to BigQuery via the same bigquery_sink used by
+the live API -- the exact same tables, the exact same code path, so
+infra/bigquery/queries_aggregate.sql computes real aggregate statistics
+from real logged runs, not a separate mechanism (PRD §25).
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from pact.logging import bigquery_sink
 from pact.models.schemas import AgentCard, PolicyConstraints, Requirement, VendorId
 from pact.orchestration.graph import run_negotiation
 from pact.orchestration.state import NegotiationStatus
@@ -53,7 +55,11 @@ class _ScenarioPricingSource:
         return f"scenario catalogue fixture ({vendor_id.value})"
 
 
-def run_scenario(scenario: dict) -> dict:
+def run_scenario(scenario: dict, sink_to_bigquery: bool = False) -> dict:
+    """`sink_to_bigquery` defaults to False so tests importing this
+    function stay fast and don't write real rows on every run; the CLI
+    entrypoint below (`main()`) passes True -- that's the one real
+    invocation meant to populate BigQuery."""
     vendor_configs = {
         VendorId(vid): cfg for vid, cfg in scenario["vendors"].items()
     }
@@ -91,6 +97,8 @@ def run_scenario(scenario: dict) -> dict:
         pricing_source=_ScenarioPricingSource(vendor_configs),
         initial_claimed_discounts=initial_claimed_discounts,
     )
+    if sink_to_bigquery:
+        bigquery_sink.write_negotiation(state)  # same sink, same tables as the live API (PRD §25)
 
     compliant = state.status == NegotiationStatus.AGREED_PENDING_APPROVAL
     claim_caught = any(not r.matched for r in state.verification_results)
@@ -126,7 +134,7 @@ def run_scenario(scenario: dict) -> dict:
 
 def main() -> None:
     catalogue = yaml.safe_load(CATALOGUE_PATH.read_text())
-    results = [run_scenario(s) for s in catalogue["scenarios"]]
+    results = [run_scenario(s, sink_to_bigquery=True) for s in catalogue["scenarios"]]
 
     RESULTS_PATH.write_text(json.dumps(results, indent=2))
 

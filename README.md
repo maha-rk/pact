@@ -131,9 +131,15 @@ python scripts/run_catalogue.py
 
 Runs every scenario in `eval/scenario_catalogue.yaml` through the exact
 same pipeline code path as a live negotiation, prints a results table,
-and writes real (not invented) aggregate statistics — agreement rate,
-average rounds-to-agreement, average savings, claim/compliance catch
-rates — to `eval/results.json`.
+writes real (not invented) aggregate statistics — agreement rate, average
+rounds-to-agreement, average savings, claim/compliance catch rates — to
+`eval/results.json`, and sinks every run to the same BigQuery tables the
+live API writes to. Run the real SQL aggregate query against actual
+logged data with:
+
+```bash
+bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/queries_aggregate.sql
+```
 
 ## Current status / honest scope
 
@@ -155,6 +161,20 @@ data. What's real right now:
   never silent) if the call fails — verified working both ways against
   the live API, including under a real transient Gemini outage during
   development
+- **Gemma** — real, self-hosted (local Ollama) plausibility pre-screen on
+  every vendor claim (`pact/models/gemma_client.py`), logged as its own
+  `plausibility_screened` event -- explicitly independent of, and never
+  authoritative over, the deterministic verification verdict that
+  actually gates the negotiation (FR-4's reproducibility guarantee is
+  preserved: an LLM never decides match/mismatch)
+- **BigQuery** — real project (`pact-hackathon`), real dataset/tables
+  (`infra/bigquery/schema.sql`), written via batch load jobs (the
+  no-billing-account-required path — streaming inserts need billing
+  enabled, load jobs don't). Both the live API and the evaluation harness
+  write to the same tables; `infra/bigquery/queries_aggregate.sql` computes
+  real aggregate statistics via SQL against actual logged runs. API writes
+  run as a FastAPI background task so a slow load job never holds up the
+  HTTP response.
 
 Not yet wired into the running system (see `docs/PRD.md` §11's Google
 Technology Stack table for the intended role of each):
@@ -165,10 +185,6 @@ Technology Stack table for the intended role of each):
   connected. Typed structured input (what the form/API accept today) is
   still honest, non-fabricated input — just a narrower slice of FR-1 than
   the full modality set.
-- **Gemma** — pulled and running locally via Ollama, not yet wired into
-  the Verification Agent's pre-screening step
-- **BigQuery** — the negotiation log/event schema (`orchestration/state.py`)
-  is BigQuery-shaped and ready; the actual sink isn't connected yet
 - **GCP vendor**, **RunPod vendor** — scaffolded, no real pricing
   integration yet
 - **Google ADK** — the 6 agents are structured as ADK would orchestrate
