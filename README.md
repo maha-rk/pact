@@ -190,8 +190,39 @@ Technology Stack table for the intended role of each):
 - **Google ADK** — the 6 agents are structured as ADK would orchestrate
   them, but the current pipeline (`orchestration/graph.py`) is a direct
   Python implementation, not literally running through ADK
-- **Cloud Run deployment** — not yet deployed; everything above runs
-  locally
 
 Nothing in this list is faked to appear more complete than it is — see
 `docs/PRD.md` §32 for the project's explicit non-claims.
+
+## Deployment
+
+**Cloud Run was not used.** It requires a linked billing account (even
+though actual usage would very likely stay within the free tier) — this
+build deliberately avoids requiring payment info anywhere, including
+here.
+
+Instead: `infra/huggingface/Dockerfile` builds a single container running
+all three backend services plus the built frontend behind one port
+(7860), tested and confirmed working locally. Hugging Face Spaces was
+evaluated as a free host for that container next, but its Docker SDK
+turned out to require a paid PRO subscription on their current pricing —
+also ruled out for the same no-payment reason.
+
+The container is instead exposed via **ngrok** (free account + authtoken,
+no card) for a real, working public URL:
+
+```bash
+docker build -f infra/huggingface/Dockerfile -t pact-deploy .
+docker run -d --name pact-deploy-run -p 7860:7860 -e GEMINI_API_KEY="<key>" pact-deploy
+ngrok http 7860
+```
+
+This is a real, live, working deployment — verified end to end (health
+check, frontend, and a full negotiation with correct results) over the
+actual public internet, not just localhost. Two honest caveats: it runs
+on the operator's own machine rather than a managed cloud host (the
+container must stay running for the URL to work), and ngrok's free tier
+issues a new random subdomain each time the tunnel restarts, and shows
+first-time visitors a one-click interstitial page before reaching the
+app. Both are disclosed limitations of the no-payment path chosen here,
+not attempts to hide them.
