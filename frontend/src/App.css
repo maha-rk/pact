@@ -54,6 +54,24 @@ section.results {
   margin: 0 0 16px;
 }
 
+.guardrail-warnings {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guardrail-warnings li {
+  font-size: 13px;
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

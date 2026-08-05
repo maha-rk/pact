@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-44-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-47-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
@@ -188,6 +188,7 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 | Verification data | AWS Price List Bulk API, Azure Retail Prices API | Live, public, keyless — the independent ground truth every claim is checked against |
 | Reasoning & intake | Gemini (`gemini-flash-latest`) | Decision narration and photo/voice requirement extraction — never the price |
 | Plausibility pre-screen | Gemma 3 4B, self-hosted via Ollama | Independent, fast pre-screen — never authoritative over the deterministic verdict |
+| Intake guardrails | `protectai/deberta-v3-base-prompt-injection-v2` + Microsoft Presidio, both self-hosted | Prompt-injection and PII detection on FR-1's text/voice intake — no external API, no cost |
 | Persistence & analytics | Google BigQuery | Negotiation logs and evaluation-harness aggregate statistics |
 | Deployment | Docker (single container) + ngrok | Cardless public URL — see [Deployment](#deployment) |
 
@@ -402,9 +403,9 @@ pytest tests/
 | Layer | Count | What it proves |
 |---|---|---|
 | Unit | 13 | Deterministic concession-curve math, compliance rule matching — no external calls |
-| Integration | 19 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle |
+| Integration | 22 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection |
 | E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
-| **Total** | **44** | |
+| **Total** | **47** | |
 
 None of the integration or e2e tests mock the external APIs — they hit
 real AWS, real Azure, and (when a key is configured) the real Gemini API,
@@ -444,6 +445,7 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | Real MCP server (`pricing_lookup` / `verify_claim` over stdio) | ✅ Implemented and tested |
 | Real Google ADK orchestration (`SequentialAgent` + `Runner`) | ✅ Implemented and tested |
 | Gemini Vision photo/voice requirement intake (FR-1) | ✅ Implemented and tested |
+| Self-hosted prompt-injection + PII guardrails on text/voice intake | ✅ Implemented and tested |
 | Gemini narration of individual negotiation moves, not just the final decision | 🔭 Designed, not yet connected |
 | GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
 | Vertex AI as Gemini's production serving backbone | 🔭 Deferred — requires a billing-enabled GCP project |
@@ -552,6 +554,21 @@ data. What's real right now:
   only pre-fill the existing form for the user to review — nothing is
   auto-submitted, preserving both the human-in-the-loop framing and the
   "no invented value" acceptance criterion.
+- **Intake guardrails — self-hosted, tested against a hosted alternative
+  before choosing** — `pact/models/guardrail_client.py` screens FR-1's
+  text/voice intake for prompt injection (`protectai/deberta-v3-base-prompt-injection-v2`
+  via `transformers`) and PII (Microsoft Presidio), both self-hosted with
+  no external API or cost. Enkrypt AI's hosted guardrails API was tried
+  first (free tier, no card) and tested live against a crafted injection
+  attempt and a realistic quote with a name/email/phone number — it
+  missed the injection entirely and caught only the email. The same two
+  cases against this self-hosted pair: the injection classifier scored
+  the attempt 99.9% INJECTION, and Presidio caught all three PII
+  entities — see `tests/integration/test_guardrail_client.py`. Like
+  Gemma's plausibility pre-screen, this is independent and never
+  authoritative; findings surface as warnings in the UI next to the
+  pre-filled form, reinforcing the human review already required before
+  a negotiation starts, rather than blocking anything silently.
 
 Not yet wired into the running system — see [Roadmap](#roadmap) below,
 and `docs/PRD.md` §11's Google Technology Stack table for the intended

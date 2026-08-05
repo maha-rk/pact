@@ -38,6 +38,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("decision");
   const [intakeStatus, setIntakeStatus] = useState<string | null>(null);
+  const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
   const [intakeBusy, setIntakeBusy] = useState(false);
   const [listening, setListening] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,11 +73,13 @@ function App() {
       ? ` Not found in the input (left as-is, please review): ${missing.join(", ")}.`
       : "";
     setIntakeStatus(foundText + missingText);
+    setGuardrailWarnings(parsed.guardrail_warnings ?? []);
   };
 
   const handlePhotoUpload = async (file: File) => {
     setIntakeBusy(true);
     setIntakeStatus(null);
+    setGuardrailWarnings([]);
     setError(null);
     try {
       const parsed = await parseRequirementFromImage(file);
@@ -169,6 +172,13 @@ function App() {
           {intakeBusy && <span className="intake-status">Extracting with Gemini...</span>}
         </div>
         {intakeStatus && <p className="intake-status">{intakeStatus}</p>}
+        {guardrailWarnings.length > 0 && (
+          <ul className="guardrail-warnings">
+            {guardrailWarnings.map((w, i) => (
+              <li key={i}>⚠️ {w}</li>
+            ))}
+          </ul>
+        )}
         <div className="form-grid">
           <label>
             GPU count

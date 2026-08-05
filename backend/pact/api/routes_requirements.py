@@ -23,6 +23,7 @@ class ParsedRequirement(BaseModel):
     budget_ceiling_usd: float | None
     region: str | None
     raw_input: str
+    guardrail_warnings: list[str] = []
 
 
 @router.post("/parse-image", response_model=ParsedRequirement)
@@ -39,6 +40,10 @@ async def parse_requirement_image(image: UploadFile = File(...)) -> ParsedRequir
         fields = parse_requirement_from_image(data, image.content_type)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Requirement parsing unavailable: {exc}") from exc
+    # No guardrail screen here: there's no separate OCR step producing raw
+    # text to screen, and the placeholder raw_input below isn't real user
+    # text -- see PRD §23a for this scope limitation, stated explicitly
+    # rather than silently applying a screen that wouldn't do anything.
     return ParsedRequirement(**fields, raw_input=f"[Parsed from uploaded photo: {image.filename}]")
 
 
@@ -47,10 +52,12 @@ async def parse_requirement_text(text: str = Form(...)) -> ParsedRequirement:
     if not text.strip():
         raise HTTPException(status_code=422, detail="text must not be empty")
 
+    from pact.models.guardrail_client import screen_text_input
     from pact.models.requirement_parser import parse_requirement_from_text
 
     try:
         fields = parse_requirement_from_text(text)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Requirement parsing unavailable: {exc}") from exc
-    return ParsedRequirement(**fields, raw_input=text)
+    warnings = screen_text_input(text)
+    return ParsedRequirement(**fields, raw_input=text, guardrail_warnings=warnings)

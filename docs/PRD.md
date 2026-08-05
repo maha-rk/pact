@@ -412,9 +412,9 @@ boundary FR-4 and FR-5 enforce at the architecture level, applied here at
 the prompt level.
 
 **Guardrail layer**: prompt injection and PII exposure risk on the
-free-text/photo/voice intake path (FR-1 is the only place raw,
-unstructured user input reaches an LLM) is addressed via Enkrypt AI —
-see §23a.
+free-text/voice intake path (FR-1 is the only place raw, unstructured
+user input reaches an LLM) is addressed by a real, self-hosted
+prompt-injection classifier and PII detector — see §23a.
 
 ---
 
@@ -661,15 +661,32 @@ labeled accordingly.
   encryption for BigQuery-stored negotiation logs relies on BigQuery's
   own default encryption at rest; no additional application-level
   encryption is implemented or claimed.
-- **LLM-specific guardrails (Enkrypt AI)**: FR-1's photo/voice/text
+- **LLM-specific guardrails — real, self-hosted**: FR-1's text/voice
   requirement intake (`pact/models/requirement_parser.py`) is the one
   place in the system where raw, unstructured user input reaches an LLM
   before any deterministic validation — the natural target for prompt
-  injection and PII exposure. Enkrypt AI's guardrail API is the intended
-  layer for this: prompt injection detection on the input before it
-  reaches Gemini, and PII detection/redaction before anything derived
-  from user input is written to BigQuery (§25). See §32 for current
-  implementation status of this layer specifically.
+  injection and PII exposure. `pact/models/guardrail_client.py`
+  implements this for real: a fine-tuned `deberta-v3-base` prompt-injection
+  classifier (`protectai/deberta-v3-base-prompt-injection-v2`, via
+  `transformers`) and Microsoft Presidio for PII detection, both running
+  self-hosted with no external API, no rate limit, and no cost.
+
+  **Enkrypt AI was evaluated first and rejected based on real test
+  results, not assumption**: its hosted guardrails API (free tier, no
+  card) was tested live against a crafted prompt-injection attempt and a
+  realistic quote containing a name, email, and phone number. It missed
+  the injection attempt entirely (scored it 100% safe) and caught only
+  the email, missing the name and phone number. The same two test cases
+  run against the self-hosted alternative: the injection classifier
+  scored the same attempt 99.9% INJECTION, and Presidio caught all three
+  PII entities. Side-by-side, the self-hosted option won on every real
+  test and removes an external dependency/rate-limit risk during a live
+  demo — so it replaces Enkrypt AI rather than supplementing it. Like
+  Gemma's plausibility pre-screen (§16), this layer is independent and
+  never authoritative: it surfaces warnings to the human reviewing the
+  pre-filled form (reinforcing FR-1's human-in-the-loop design) and never
+  blocks the actual Gemini call. Findings are not currently written to
+  BigQuery — see §32.
 
 ---
 
@@ -852,10 +869,13 @@ is scoped against.
   CORS restriction (§26), and today's real observability is the
   event-level tagging already in the negotiation log, not full
   request-level tracing.
-- Does not claim Enkrypt AI is wired into the running system yet — it is
-  the intended guardrail layer for FR-1's LLM-facing intake path (§23a),
-  evaluated and confirmed to offer a genuine no-card free tier, but not
-  yet integrated as of this PRD revision.
+- Does not claim the guardrail layer (§23a) catches every possible
+  prompt injection or PII pattern — it is tested and proven against the
+  specific cases documented in §23a and `tests/integration/test_guardrail_client.py`,
+  not exhaustively red-teamed. It is independent and non-authoritative by
+  design (same as Gemma's plausibility pre-screen, §16): a miss here
+  degrades to the existing human-review safety net (FR-1), not to a
+  silent failure.
 - **Qdrant, evaluated and not adopted**: considered for semantic
   vendor-capability matching. Not adopted because no genuine use case
   exists at the current build's scale — vendor discovery is structured
@@ -929,9 +949,12 @@ throughout this document, consolidated in one place:
   handling auth, rate limiting, and TLS termination; documented as target
   design for a multi-tenant version (§23a), not yet built for this
   single-operator demo.
-- **Enkrypt AI** — a third-party LLM guardrail service (prompt injection
-  detection, PII detection/redaction) identified as the intended
-  protection layer for FR-1's LLM-facing intake path (§23a).
+- **Guardrail layer** — the real, self-hosted prompt-injection classifier
+  (`protectai/deberta-v3-base-prompt-injection-v2`) and Microsoft Presidio
+  PII detector protecting FR-1's LLM-facing intake path (§23a). A hosted
+  alternative (Enkrypt AI) was evaluated and rejected after real
+  side-by-side testing showed this self-hosted combination catching more
+  real attacks with no external dependency.
 - **OpenTelemetry** — an open observability standard referenced as the
   target format for the request-level LLM tracing described in §23b.
 

@@ -17,6 +17,7 @@ export interface ParsedRequirement {
   budget_ceiling_usd: number | null;
   region: string | null;
   raw_input: string;
+  guardrail_warnings: string[];
 }
 
 async function handle<T>(resp: Response): Promise<T> {
