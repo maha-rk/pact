@@ -20,7 +20,7 @@ def verify_claim(offer: Offer, requirement: Requirement, pricing_source: Pricing
     matched = claimed <= real_rate + MATCH_TOLERANCE
     return VerificationResult(
         vendor_id=offer.vendor_id,
-        claim_checked=f"committed-use discount rate for a {requirement.contract_months}-month term",
+        claim_checked=f"discount rate claimed for a {requirement.contract_months}-month term",
         claimed_value=claimed,
         actual_value=real_rate,
         source=pricing_source.source_label(offer.vendor_id),

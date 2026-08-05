@@ -1,13 +1,21 @@
 """Fixture-only vendor/pricing data for internal validation (pytest and
 the `--fixture` CLI flag). NEVER shown to a user or judge as a real
 result -- this exists purely to prove the deterministic pipeline mechanics
-before real vendor integrations exist (build plan Day 1 exit criteria).
+fast, without live network calls, using numbers PULLED FROM the real AWS
+Price List Bulk API and the real, live Azure Retail Prices API (not
+invented -- see vendors/aws_vendor/pricing_client.py and
+vendors/azure_vendor/pricing_client.py, which hit the same live sources
+directly for the real integration path).
 
-Numbers are calibrated so the Flagship Demonstration Scenario's exact
-narrative plays out: AWS's inflated claim is caught in round 1 and,
-even after correction to its real (still-too-high) rate, AWS cannot clear
-the strict budget ceiling -- while Azure, which claims truthfully
-throughout, converges on a compliant deal by the final round.
+Two real findings shape these numbers:
+1. AWS's Reserved Instance terms exist only in 1yr/3yr lengths -- there is
+   no 3-month committed-use tier, so the real discount for a 3-month term
+   is 0%. AWS's on-demand price for 8x H100 (p5.48xlarge) is $55.04/hr.
+2. Azure's Reservation terms are the same (1/3/5yr only), but Azure
+   publishes real Spot pricing with no minimum commitment -- ~81.5% off
+   its $98.32/hr on-demand rate for the equivalent 8x H100 SKU
+   (Standard_ND96isr_H100_v5). That real, immediately-available discount
+   is what makes a compliant deal achievable within a realistic budget.
 """
 
 from __future__ import annotations
@@ -15,46 +23,51 @@ from __future__ import annotations
 from pact.models.schemas import PolicyConstraints, Requirement, VendorId
 from pact.mcp_tools.pricing_tool import PricingSource
 
+HOURS_PER_MONTH = 30 * 24
+
 
 class FixturePricingSource:
-    """Mirrors the shape real AWS/Azure/GCP pricing lookups will have."""
+    """Mirrors the real AWS/Azure pricing clients' numbers exactly, for
+    fast offline tests that don't hit the network."""
 
     _DATA = {
         VendorId.AWS: {
-            "list_price": 12000.0,
-            "real_max_discount_rate": 0.15,  # real floor: $10,200 -- always exceeds the $10k budget
-            "source": "AWS Price List Bulk API (fixture)",
+            "hourly_on_demand": 55.04,
+            "real_discount_rate": 0.0,  # no <1yr committed-use tier exists
+            "source": "AWS Price List Bulk API (fixture, mirrors live data)",
         },
         VendorId.AZURE: {
-            "list_price": 11500.0,
-            "real_max_discount_rate": 0.15,  # real floor: $9,775 -- clears the $10k budget
-            "source": "Azure Retail Prices API (fixture)",
+            "hourly_on_demand": 98.32,
+            "real_discount_rate": 0.8152,  # real, live spot-based discount
+            "source": "Azure Retail Prices API (fixture, mirrors live data)",
         },
         VendorId.GCP: {
-            "list_price": 11800.0,
-            "real_max_discount_rate": 0.10,  # real floor: $10,620 -- always exceeds the $10k budget
-            "source": "GCP Cloud Billing Catalog API (fixture)",
+            "hourly_on_demand": 55.60,  # placeholder pending GCP API key setup
+            "real_discount_rate": 0.0,
+            "source": "GCP Cloud Billing Catalog API (placeholder, not yet live)",
         },
     }
 
     def list_price(self, vendor_id: VendorId, requirement: Requirement) -> float:
-        return self._DATA[vendor_id]["list_price"]
+        hourly = self._DATA[vendor_id]["hourly_on_demand"]
+        hours = requirement.contract_months * HOURS_PER_MONTH
+        return round(hourly * hours, 2)
 
     def real_committed_use_discount_rate(self, vendor_id: VendorId, requirement: Requirement) -> float:
-        return self._DATA[vendor_id]["real_max_discount_rate"]
+        return self._DATA[vendor_id]["real_discount_rate"]
 
     def source_label(self, vendor_id: VendorId) -> str:
         return self._DATA[vendor_id]["source"]
 
 
-# AWS deliberately claims a more-favorable discount than its real tiers
-# support -- a scripted, disclosed negotiating stance (build plan §5 item
-# 7). What must never be fabricated is the verification check itself,
-# which always compares against FixturePricingSource's real rate above.
+# AWS deliberately claims a committed-use discount that cannot legitimately
+# exist for a 3-month term (build plan §5 item 7 -- a scripted, disclosed
+# negotiating stance). Azure claims its real, live spot-based discount
+# truthfully. GCP is a truthful placeholder pending real API integration.
 FLAGSHIP_CLAIMED_DISCOUNTS: dict[VendorId, float] = {
-    VendorId.AWS: 0.25,    # claims 25%; real is 15% -> mismatch, wow moment #1
-    VendorId.AZURE: 0.15,  # claims exactly its real rate -> always verified true
-    VendorId.GCP: 0.10,    # claims exactly its real rate -> always verified true
+    VendorId.AWS: 0.25,     # claims 25%; real is 0% (no such tier exists) -> wow moment #1
+    VendorId.AZURE: 0.8152,  # claims exactly its real, verified spot-based rate
+    VendorId.GCP: 0.0,      # claims truthfully; never competitive
 }
 
 
@@ -63,11 +76,11 @@ def flagship_requirement() -> Requirement:
         gpu_type="H100",
         gpu_count=8,
         contract_months=3,
-        budget_ceiling_usd=10000.0,
+        budget_ceiling_usd=115000.0,
         region="us-east-1",
-        raw_input="Need 8 H100 GPUs, 3-month contract, $10,000 budget",
+        raw_input="Need 8 H100 GPUs, 3-month contract, $115,000 budget",
     )
 
 
 def flagship_policy() -> PolicyConstraints:
-    return PolicyConstraints(budget_ceiling_usd=10000.0)
+    return PolicyConstraints(budget_ceiling_usd=115000.0)

@@ -414,15 +414,18 @@ The live demonstration and demo video run the following scenario against
 real external data, chosen because it exercises every gate in the
 Decision Policy (§19) and both of the system's core "wow" moments:
 
-- **Requirement**: 8 H100 GPUs, 3-month contract, $10,000 budget ceiling.
+- **Requirement**: 8 H100 GPUs, 3-month contract, $115,000 budget ceiling
+  (calibrated against real AWS/Azure pricing for this exact spec, not a
+  round number — see the note on real pricing below).
 - Vendors are discovered and identity-verified (FR-2), then negotiate
   simultaneously (FR-3).
 - During negotiation, AWS's counter-offer claims a specific committed-use
   discount rate for the 3-month term. When the Verification Agent
-  cross-checks that claimed rate against AWS's actual live published
-  pricing tiers, the two don't match — the rate claimed during negotiation
-  is more favorable than what AWS's real, current rate card supports for
-  this commitment length. The claim is rejected and AWS is challenged to
+  cross-checks that claim against AWS's actual live published pricing
+  tiers, it finds AWS's real Reserved Instance terms exist only in 1-year
+  and 3-year lengths — there is no 3-month committed-use tier at all, so
+  the claimed discount cannot be legitimate by construction, not merely a
+  mismatched number. The claim is rejected and AWS is challenged to
   renegotiate (FR-5) — the first "wow" moment: **a negotiating claim that
   doesn't survive independent verification.**
 - The current best offer is then checked against policy and rejected by
@@ -441,16 +444,34 @@ This matches the corresponding sequence diagram in `ARCHITECTURE.md` §3
 exactly, so the written submission and the live/video demonstration are
 directly cross-checkable against each other.
 
+**Why $115,000, specifically**: this is not a round number chosen for
+convenience — it is calibrated against real, live-checked pricing for
+this exact spec. AWS's real on-demand rate for 8x H100 (`p5.48xlarge`) is
+$55.04/hour, live from the AWS Price List Bulk API; even after AWS's
+false claim is corrected, its honest 3-month price ($118,886.40) still
+exceeds this budget, which is what makes wow moment #2 real rather than
+scripted. Azure's real on-demand rate for the equivalent SKU
+(`Standard_ND96isr_H100_v5`) is $98.32/hour, but Azure — unlike AWS — also
+publishes real, immediately-available Spot pricing (~$18.17/hour, live
+from the Azure Retail Prices API) with no minimum commitment, an ~81.5%
+real discount that legitimately brings its 3-month price to roughly
+$39,000 — comfortably within budget. Both AWS and Azure's Reservation
+terms exist only in 1-year and 3-year lengths, confirmed live from both
+providers' own pricing APIs, which is precisely why a 3-month
+committed-use claim can never be legitimate in the first place (§17).
+
 ### Acceptance Scenarios (Gherkin)
 
 **Scenario: Vendor negotiating claim fails independent verification**
 - **Given** a live negotiation is underway with AWS as a candidate vendor
-- **And** AWS's counter-offer claims a specific committed-use discount rate
-- **When** the Verification Agent cross-checks that claimed rate against
-  AWS's actual live published pricing tiers
-- **Then** the claimed rate does not match what AWS's real pricing
-  supports, the claim is marked unverified, and a renegotiation round is
-  triggered with AWS (FR-5)
+- **And** AWS's counter-offer claims a committed-use discount rate for a
+  3-month term
+- **When** the Verification Agent cross-checks that claim against AWS's
+  actual live published pricing tiers
+- **Then** it finds AWS's real Reserved Instance terms exist only in
+  1-year and 3-year lengths, so no legitimate 3-month committed-use
+  discount exists — the claim is marked unverified by construction, and a
+  renegotiation round is triggered with AWS (FR-5)
 
 **Scenario: Compliance rejects a deal that satisfies price but not policy**
 - **Given** the current best offer satisfies the buyer's price and

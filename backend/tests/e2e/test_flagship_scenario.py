@@ -40,7 +40,7 @@ def test_wow_moment_1_aws_claim_caught_and_rejected():
     ]
     assert aws_rejections, "AWS's inflated claim must be caught by the Verification Agent"
     assert aws_rejections[0].claimed_value == 0.25
-    assert aws_rejections[0].actual_value == 0.15
+    assert aws_rejections[0].actual_value == 0.0  # no <1yr committed-use tier exists, per real AWS data
 
     reject_events = [e for e in state.events if e.event_type == EventType.CLAIM_REJECTED]
     renegotiate_events = [e for e in state.events if e.event_type == EventType.RENEGOTIATION_TRIGGERED]

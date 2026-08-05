@@ -31,7 +31,7 @@ def build_decision(
         evidence.append(
             EvidenceItem(
                 label="Verified pricing claim",
-                value=f"{verification.actual_value:.1%} committed-use discount confirmed",
+                value=f"{verification.actual_value:.1%} discount confirmed against real pricing data",
                 source=verification.source,
             )
         )

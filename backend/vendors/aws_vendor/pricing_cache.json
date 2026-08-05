@@ -1,0 +1,65 @@
+{
+  "instance_type": "p5.48xlarge",
+  "region": "us-east-1",
+  "gpu_count": 8,
+  "gpu_type": "H100",
+  "on_demand_hourly_usd": 55.04,
+  "reserved_terms": [
+    {
+      "lease_length": "3yr",
+      "purchase_option": "Partial Upfront",
+      "offering_class": "standard",
+      "hourly_usd": 11.008
+    },
+    {
+      "lease_length": "3yr",
+      "purchase_option": "All Upfront",
+      "offering_class": "convertible",
+      "hourly_usd": 0.0
+    },
+    {
+      "lease_length": "3yr",
+      "purchase_option": "Partial Upfront",
+      "offering_class": "convertible",
+      "hourly_usd": 18.7136
+    },
+    {
+      "lease_length": "1yr",
+      "purchase_option": "No Upfront",
+      "offering_class": "convertible",
+      "hourly_usd": 43.344
+    },
+    {
+      "lease_length": "1yr",
+      "purchase_option": "All Upfront",
+      "offering_class": "convertible",
+      "hourly_usd": 0.0
+    },
+    {
+      "lease_length": "3yr",
+      "purchase_option": "No Upfront",
+      "offering_class": "standard",
+      "hourly_usd": 23.77728
+    },
+    {
+      "lease_length": "1yr",
+      "purchase_option": "Partial Upfront",
+      "offering_class": "convertible",
+      "hourly_usd": 20.64
+    },
+    {
+      "lease_length": "3yr",
+      "purchase_option": "All Upfront",
+      "offering_class": "standard",
+      "hourly_usd": 0.0
+    },
+    {
+      "lease_length": "3yr",
+      "purchase_option": "No Upfront",
+      "offering_class": "convertible",
+      "hourly_usd": 40.42138
+    }
+  ],
+  "source": "AWS Price List Bulk API",
+  "source_url": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/us-east-1/index.json"
+}

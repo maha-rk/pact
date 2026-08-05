@@ -81,7 +81,7 @@ sequenceDiagram
     participant C as Compliance Agent
     participant Dec as Decision Agent
 
-    U->>B: "8 H100s, 3-month contract, $10k budget"
+    U->>B: "8 H100s, 3-month contract, $115k budget"
     B->>D: structured requirement
     D->>AWS: A2A Agent Card request
     D->>AZ: A2A Agent Card request
@@ -99,8 +99,8 @@ sequenceDiagram
         GCP-->>N: counter-offer
     end
 
-    N->>V: verify AWS's claimed committed-use discount rate
-    V-->>N: rate doesn't match AWS's live published pricing tiers
+    N->>V: verify AWS's claimed 3-month committed-use discount rate
+    V-->>N: no such tier exists -- AWS's real terms are 1yr/3yr only
     N->>AWS: challenge, renegotiate
     AWS-->>N: revised, verified offer
 

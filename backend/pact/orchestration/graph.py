@@ -16,9 +16,13 @@ from pact.models.schemas import AgentCard, Offer, PolicyConstraints, Requirement
 from pact.orchestration.state import EventType, NegotiationState, NegotiationStatus
 
 DEFAULT_MAX_ROUNDS = 6
-DEFAULT_BUYER_OPENING_FRACTION = 0.67
-"""The buyer's opening bid as a fraction of the average opening vendor
-price -- an aggressive first offer, per standard concession-curve practice."""
+DEFAULT_BUYER_OPENING_FRACTION = 0.5
+"""The buyer's opening bid as a fraction of its own budget ceiling -- an
+aggressive first offer, per standard concession-curve practice. Based on
+the buyer's budget rather than vendor list prices, since real vendor list
+prices can vary enormously (on-demand vs. real short-term-available
+discount mechanisms like spot pricing) and shouldn't anchor the buyer's
+own opening posture."""
 
 
 def run_negotiation(
@@ -63,7 +67,7 @@ def run_negotiation(
 
     list_prices = {v: pricing_source.list_price(v, requirement) for v in state.active_vendors}
     current_claimed_discount = dict(initial_claimed_discounts)
-    buyer_opening = sum(list_prices.values()) / len(list_prices) * DEFAULT_BUYER_OPENING_FRACTION
+    buyer_opening = requirement.budget_ceiling_usd * DEFAULT_BUYER_OPENING_FRACTION
 
     winning_offer: Offer | None = None
     winning_verification = None
