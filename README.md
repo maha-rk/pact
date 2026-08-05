@@ -18,7 +18,8 @@ backend/
     agents/             Buyer, Discovery, Negotiation, Verification, Compliance, Decision
     negotiation/         Deterministic concession-curve logic (no LLM in the price path)
     orchestration/        The pipeline (graph.py), state/event log, human approval gate
-    mcp_tools/            pricing_lookup / verify_claim tool wrappers
+    mcp_tools/            pricing_lookup / verify_claim: core logic + a real MCP server exposing both as MCP tools
+    adk/                   Real Google ADK orchestration of the pipeline (SequentialAgent + Runner)
     a2a/                  HTTP-based vendor transport (see note below)
     models/               Shared data schemas
     api/                  FastAPI routes (pact-core)
@@ -109,6 +110,13 @@ cd backend && source .venv/bin/activate
 python scripts/run_scenario.py --fixture flagship --approve
 ```
 
+### Or run the real MCP server standalone
+
+```bash
+cd backend && source .venv/bin/activate
+python -m pact.mcp_tools.server   # speaks real MCP over stdio; connect any MCP client
+```
+
 ## Tests
 
 ```bash
@@ -175,21 +183,62 @@ data. What's real right now:
   real aggregate statistics via SQL against actual logged runs. API writes
   run as a FastAPI background task so a slow load job never holds up the
   HTTP response.
+- **MCP** — `pact/mcp_tools/server.py` is a real MCP server (the official
+  `mcp` SDK, v2.0+), exposing `pricing_lookup` and `verify_claim` as
+  genuine MCP tools over the real stdio protocol, backed by the same real
+  AWS/Azure pricing clients the live negotiation pipeline uses — not just
+  a Protocol-shaped module named after the concept. Proven with a real
+  client integration test (`tests/integration/test_mcp_server.py`) that
+  spawns the server as an actual subprocess, calls `list_tools()` /
+  `call_tool()` over the wire via the official client SDK, and asserts on
+  real AWS pricing and the real flagship claim-mismatch — no in-process
+  shortcuts. `pact/mcp_tools/pricing_tool.py` and `verification_tool.py`
+  remain the plain-Python core logic these MCP tools wrap; the pipeline
+  itself still calls that core logic directly (in-process, for latency),
+  while the MCP server exposes the same logic to any external MCP client.
+- **Google ADK** — `pact/adk/pipeline.py` runs the negotiation pipeline
+  through a real ADK `SequentialAgent` under a real ADK `Runner` and
+  `InMemorySessionService`, composed of two genuinely separate ADK
+  agents (Discovery, then Negotiation/Verification/Compliance/Decision —
+  the natural phase boundary, since verification and compliance are
+  checked per-offer inside each live negotiation round, not as
+  independently-scheduled steps). Both ADK agents call the exact same
+  phase functions `orchestration/graph.py`'s direct path calls — one
+  source of truth for the negotiation logic, proven identical via
+  `tests/e2e/test_flagship_scenario_via_adk.py`, which runs the flagship
+  scenario through the real ADK agent tree and asserts the same verified
+  numbers as the direct path, plus that the two ADK agents genuinely ran
+  in order. `orchestration/graph.run_negotiation` remains what the live
+  API, CLI, and every other test call directly.
+
+- **Gemini Vision — photo/voice requirement intake (FR-1)** —
+  `pact/models/requirement_parser.py` calls real Gemini Vision (structured
+  JSON output via `response_json_schema`) to extract `gpu_count`,
+  `contract_months`, `budget_ceiling_usd`, `gpu_type`, and `region` from
+  either a photographed quote/invoice or a text transcript, exposed via
+  `POST /requirements/parse-image` and `POST /requirements/parse-text`.
+  The model is explicitly instructed to return `null` for any field not
+  actually present in the input rather than guess — verified against the
+  real API with a rendered synthetic invoice image (correctly extracted
+  8 GPUs / 3 months / $115,000) and against ambiguous text (correctly
+  returned all-null when nothing concrete was stated), in
+  `tests/integration/test_requirement_parser.py`. The frontend's "Upload a
+  photo" button sends an image straight to the image endpoint; "Speak your
+  requirement" uses the browser's native `SpeechRecognition` API to get a
+  transcript (a real, working speech-to-text conversion, not a stub), then
+  sends that transcript to the text endpoint. Either way, extracted fields
+  only pre-fill the existing form for the user to review — nothing is
+  auto-submitted, preserving both the human-in-the-loop framing and the
+  "no invented value" acceptance criterion.
 
 Not yet wired into the running system (see `docs/PRD.md` §11's Google
 Technology Stack table for the intended role of each):
 
-- **Gemini — requirement parsing and per-move narration** — the Reasoning
-  narration above is live; parsing free-text/voice/photo input (FR-1) and
-  narrating individual negotiation moves are designed but not yet
-  connected. Typed structured input (what the form/API accept today) is
-  still honest, non-fabricated input — just a narrower slice of FR-1 than
-  the full modality set.
+- **Gemini — per-move negotiation narration** — narrating individual
+  negotiation moves in real time (as opposed to the final Reasoning
+  statement, which is live) is designed but not yet connected.
 - **GCP vendor**, **RunPod vendor** — scaffolded, no real pricing
   integration yet
-- **Google ADK** — the 6 agents are structured as ADK would orchestrate
-  them, but the current pipeline (`orchestration/graph.py`) is a direct
-  Python implementation, not literally running through ADK
 
 Nothing in this list is faked to appear more complete than it is — see
 `docs/PRD.md` §32 for the project's explicit non-claims.

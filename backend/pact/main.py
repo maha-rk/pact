@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from pact.api.routes_negotiation import router as negotiation_router
+from pact.api.routes_requirements import router as requirements_router
 
 app = FastAPI(title="Pact — Autonomous B2B Procurement Negotiation")
 
@@ -24,6 +25,7 @@ app.add_middleware(
 )
 
 app.include_router(negotiation_router)
+app.include_router(requirements_router)
 
 
 @app.get("/health")

@@ -27,33 +27,16 @@ discount mechanisms like spot pricing) and shouldn't anchor the buyer's
 own opening posture."""
 
 
-def run_negotiation(
-    requirement: Requirement,
-    policy: PolicyConstraints,
+def run_discovery_phase(
+    state: NegotiationState,
     candidate_vendors: list[VendorId],
     agent_cards: dict[VendorId, AgentCard],
-    pricing_source: PricingSource,
-    initial_claimed_discounts: dict[VendorId, float],
-    max_rounds: int = DEFAULT_MAX_ROUNDS,
-    vendor_client: HttpVendorClient | None = None,
-    narrator: decision_agent.Narrator | None = None,
-    plausibility_screener: PlausibilityScreener | None = None,
-) -> NegotiationState:
-    """If `vendor_client` is provided, each round's vendor offer is
-    fetched over real HTTP from that vendor's genuinely separate service
-    (PRD §17) -- the negotiation actually happens across process/service
-    boundaries, not just in-process math. Without it (e.g. fast unit/e2e
-    tests against fixtures), offers are computed in-process using the same
-    deterministic function the vendor services call internally -- the math
-    is identical either way; only the transport differs."""
-    state = NegotiationState(
-        negotiation_id=str(uuid.uuid4()),
-        requirement=requirement,
-        policy=policy,
-    )
-    state.log(EventType.REQUIREMENT_RECEIVED, detail=requirement.raw_input)
-
-    # --- Discovery Agent: verify identity before negotiating (FR-2) ---
+) -> None:
+    """Discovery Agent: verify vendor identity before negotiating (FR-2).
+    Mutates `state.active_vendors` / `state.unavailable_vendors` in place
+    and, if no vendor passes, sets a terminal NO_COMPLIANT_DEAL decision --
+    same phase boundary the ADK orchestration layer (`pact/adk/pipeline.py`)
+    composes as its own real ADK agent."""
     for vendor_id in candidate_vendors:
         card = agent_cards[vendor_id]
         if discovery_agent.verify_agent_card(card):
@@ -75,8 +58,23 @@ def run_negotiation(
         state.status = NegotiationStatus.NO_COMPLIANT_DEAL
         state.log(EventType.NO_COMPLIANT_DEAL, detail="No vendors passed identity verification")
         state.decision, _ = decision_agent.build_decision(state.negotiation_id, None, None, None)
-        return state
 
+
+def run_negotiation_and_decision_phase(
+    state: NegotiationState,
+    requirement: Requirement,
+    policy: PolicyConstraints,
+    agent_cards: dict[VendorId, AgentCard],
+    pricing_source: PricingSource,
+    initial_claimed_discounts: dict[VendorId, float],
+    max_rounds: int = DEFAULT_MAX_ROUNDS,
+    vendor_client: HttpVendorClient | None = None,
+    narrator: decision_agent.Narrator | None = None,
+    plausibility_screener: PlausibilityScreener | None = None,
+) -> None:
+    """Negotiation Agent rounds -> Verification gate -> Compliance gate ->
+    Comparison -> Decision Agent (PRD §19). Requires `state.active_vendors`
+    already populated by `run_discovery_phase`. Mutates `state` in place."""
     list_prices = {v: pricing_source.list_price(v, requirement) for v in state.active_vendors}
     current_claimed_discount = dict(initial_claimed_discounts)
     buyer_opening = requirement.budget_ceiling_usd * DEFAULT_BUYER_OPENING_FRACTION
@@ -207,7 +205,7 @@ def run_negotiation(
             detail="No vendor produced a verified, compliant offer within the round limit",
         )
         state.decision, _ = decision_agent.build_decision(state.negotiation_id, None, None, None)
-        return state
+        return
 
     state.status = NegotiationStatus.AGREED_PENDING_APPROVAL
     state.decision, narrator_error = decision_agent.build_decision(
@@ -225,5 +223,56 @@ def run_negotiation(
         vendor_id=winning_offer.vendor_id,
         round_number=winning_offer.round_number,
         detail=state.decision.reasoning,
+    )
+
+
+def run_negotiation(
+    requirement: Requirement,
+    policy: PolicyConstraints,
+    candidate_vendors: list[VendorId],
+    agent_cards: dict[VendorId, AgentCard],
+    pricing_source: PricingSource,
+    initial_claimed_discounts: dict[VendorId, float],
+    max_rounds: int = DEFAULT_MAX_ROUNDS,
+    vendor_client: HttpVendorClient | None = None,
+    narrator: decision_agent.Narrator | None = None,
+    plausibility_screener: PlausibilityScreener | None = None,
+) -> NegotiationState:
+    """If `vendor_client` is provided, each round's vendor offer is
+    fetched over real HTTP from that vendor's genuinely separate service
+    (PRD §17) -- the negotiation actually happens across process/service
+    boundaries, not just in-process math. Without it (e.g. fast unit/e2e
+    tests against fixtures), offers are computed in-process using the same
+    deterministic function the vendor services call internally -- the math
+    is identical either way; only the transport differs.
+
+    Composes `run_discovery_phase` and `run_negotiation_and_decision_phase`
+    -- the same two phase functions `pact/adk/pipeline.py` runs as real,
+    separately-scheduled ADK agents. This function is the direct in-process
+    composition (used by the live API, CLI, and every test); the ADK
+    pipeline is a genuine, additional way to run the identical logic
+    through ADK's Runner/session/event machinery, not a replacement for it."""
+    state = NegotiationState(
+        negotiation_id=str(uuid.uuid4()),
+        requirement=requirement,
+        policy=policy,
+    )
+    state.log(EventType.REQUIREMENT_RECEIVED, detail=requirement.raw_input)
+
+    run_discovery_phase(state, candidate_vendors, agent_cards)
+    if not state.active_vendors:
+        return state
+
+    run_negotiation_and_decision_phase(
+        state,
+        requirement,
+        policy,
+        agent_cards,
+        pricing_source,
+        initial_claimed_discounts,
+        max_rounds=max_rounds,
+        vendor_client=vendor_client,
+        narrator=narrator,
+        plausibility_screener=plausibility_screener,
     )
     return state

@@ -33,6 +33,27 @@ section.results {
   margin-bottom: 16px;
 }
 
+.intake-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.intake-row button {
+  background: var(--bg);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.intake-status {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0 0 16px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
