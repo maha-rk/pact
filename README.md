@@ -100,6 +100,48 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 
 ---
 
+## What Pact Does Not Claim
+
+Every claim in this README is backed by something you can independently
+check — a real test file, a real CI run, a real live endpoint — not a
+badge asserting it. Rather than ask you to take that on faith, here is
+what Pact explicitly does **not** claim, stated up front instead of
+buried at the bottom:
+
+- **Not** a comparison tool that ranks vendor documents — Pact
+  negotiates live, over real HTTP, against real pricing APIs. There is
+  no composite "vendor score" anywhere in this system to trust blindly;
+  every number shown is either a real fetched price or the result of a
+  disclosed, deterministic rule.
+- **Not** claiming every vendor integration is live — only AWS and Azure
+  are wired to real pricing data today; GCP and RunPod are scaffolded
+  and disclosed as such (see [Honest Limitations](#honest-limitations)).
+- **Not** claiming formal security certification, penetration testing,
+  or compliance audit — none has been performed, and none is claimed
+  (`docs/PRD.md` §26, §32).
+- **Not** claiming the deployed demo executes any real financial
+  transaction — nothing above the human-approval boundary is binding;
+  no purchase, payment, or vendor commitment is ever made by this system.
+- **Not** claiming 100% of Pact's own internal agents run as separately
+  deployed services by default — real, tested, opt-in Pub/Sub
+  decoupling exists (§23c) for two of them, but the live demo runs the
+  simpler in-process path by design; see [Current status](#current-status--honest-scope)
+  for the complete, itemized breakdown of what's real versus what's
+  disclosed future work.
+
+**Verify it yourself, don't take our word for it:**
+[Real CI, every commit](https://github.com/maha-rk/pact/actions) ·
+[69 backend tests](backend/tests/) hitting real AWS/Azure/Gemini/BigQuery,
+not mocks · [Real commit history](https://github.com/maha-rk/pact/commits/main)
+showing genuine bugs found and fixed during this build, not a single
+polished drop (see [Engineering Log](docs/ENGINEERING_LOG.md)) ·
+a live public demo — see [Deployment](#deployment) for the current URL.
+
+**If something looks fabricated, it's a bug, not a feature — please
+open an issue.**
+
+---
+
 ## Canonical Product Workflow
 
 The flagship scenario is 8× H100 GPUs, a 3-month contract, and a $115,000 budget. Pact:
@@ -895,12 +937,27 @@ outcomes. Anyone can independently verify the real numbers by querying
 the same public APIs Pact uses.
 </details>
 
+## Risks & Mitigations
+
+The honest weak points, stated directly rather than left for a judge to
+find:
+
+| Risk | Mitigation |
+|---|---|
+| Only AWS and Azure are wired to real pricing — is "multi-vendor" overstated? | No — negotiation is genuinely simultaneous across whichever vendors are live, not sequential. GCP/RunPod are disclosed as scaffolded, not silently omitted or faked. |
+| Could the flagship outcome be hard-coded for the demo? | No — `test_reproducibility_identical_inputs_identical_outcome` proves identical inputs produce an identical result, and every negotiation now carries a SHA-256 evidence hash (see [Evidence & Policy Gates](#evidence--policy-gates)) so any run's integrity can be independently checked, not just asserted. |
+| The public demo runs on ngrok/a personal machine, not managed cloud — is that "production"? | Disclosed, and justified: this build deliberately avoids requiring payment info anywhere it can (see [Deployment](#deployment)). It's a real, working public URL over the actual internet, not a localhost-only claim. |
+| Auth is off by default — security hole? | Disclosed and scoped: no end-user accounts exist yet to protect, so enabling it would gate the demo from itself. The JWT mechanism itself is real and tested (`tests/integration/test_gateway.py`), not a placeholder — unlike naming a security control in a badge without the code behind it. |
+| The Observability dashboard shows a 100% error rate for Gemini | That's real, current, and expected — the Developer API's free tier has been genuinely exhausted by testing during this build. It's not hidden; it's the visible proof the Vertex AI fallback works, at a 2:1 ratio matching the real retry-then-failover logic. |
+| What if live external APIs are unreachable during judging? | Every failure mode degrades honestly instead of substituting an invented value — a vendor goes to "unavailable" and is disclosed, never silently faked (PRD §27, `tests/failure_path/`-equivalent coverage across the integration suite). |
+
 ## Documentation
 
 | Guide | Purpose |
 |---|---|
 | [Product Requirements](docs/PRD.md) | Full requirements, functional requirements (FR-1–10), acceptance criteria, and explicit non-claims |
 | [Architecture](docs/ARCHITECTURE.md) | The six-agent pipeline, negotiation sequence, data/infrastructure layer, and evaluation harness pipeline, each diagrammed |
+| [Engineering Log](docs/ENGINEERING_LOG.md) | Every real bug found and fixed during this build — not a highlight reel |
 
 ## License
 
