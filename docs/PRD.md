@@ -740,6 +740,23 @@ real, successful `vertex.generate` span — the entire fallback chain
 (§16, "Vertex AI real, tested fallback") visible end to end in the trace
 data itself, not asserted separately from it.
 
+**A real dashboard now sits on top of this data**:
+`GET /observability/summary` (`pact/api/routes_observability.py`) runs
+real SQL against `model_traces` (per-model call count, avg latency,
+total tokens, error rate) and the same aggregate query §29's evaluation
+harness uses (agreement rate, avg rounds, avg savings %, claim-mismatch
+and compliance-rejection catch rates), rendered in the frontend's
+"Observability" view. Read-only, never raises into a 500 if BigQuery is
+unreachable — degrades to an honest "not available" message instead.
+Closing this gap surfaced a real, pre-existing bug in the aggregate
+query itself: `negotiation_events` accumulates across every historical
+test/dev run, so the claim-mismatch/compliance-rejection subqueries,
+unconstrained to the `negotiation_id`s actually present in `negotiations`,
+could report a rate over 100% (116 distinct event `negotiation_id`s vs.
+5 real `negotiations` rows produced an impossible 1966% figure before
+the fix) — corrected in both `infra/bigquery/queries_aggregate.sql` and
+the dashboard's own embedded copy of the same query.
+
 ---
 
 ## 23c. Distributed Negotiation Execution
@@ -999,11 +1016,13 @@ section's credential-handling claim below is scoped against.
   protect yet; the mechanism itself is real and proven
   (`tests/integration/test_gateway.py`), not a placeholder.
 - Does not claim the real OpenTelemetry tracing (§23b) is paired with a
-  dashboard, alerting, or a managed observability backend — spans export
-  to the console and to a real BigQuery table (`model_traces`); querying
-  and visualizing that table is not yet built, the same honest gap the
-  evaluation harness's own aggregate queries (§29) once had before they
-  were written.
+  managed, third-party observability backend (Looker Studio, Grafana) or
+  alerting on anomalous behavior — `GET /observability/summary`
+  (`pact/api/routes_observability.py`) is a real, live, in-app dashboard
+  computing model-call and negotiation-outcome statistics via real SQL
+  against `model_traces` and `negotiations`/`negotiation_events`, visible
+  in the frontend's "Observability" view, but it's a query-and-render
+  page this codebase built and controls, not a managed alerting product.
 - Does not claim the guardrail layer (§23a) catches every possible
   prompt injection or PII pattern — it is tested and proven against the
   specific cases documented in §23a and `tests/integration/test_guardrail_client.py`,

@@ -20,6 +20,26 @@ header h1 {
   margin-top: 4px;
 }
 
+.top-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.top-nav button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 500;
+  padding: 8px 16px;
+}
+
+.top-nav button.active {
+  background: var(--accent);
+  border-color: var(--accent-border);
+  color: #fff;
+}
+
 section.requirement-form,
 section.results {
   border: 1px solid var(--border);
@@ -322,4 +342,110 @@ button:disabled {
 .event-muted .timeline-label {
   font-style: italic;
   font-weight: 500;
+}
+
+/* Observability dashboard */
+
+.observability-dashboard h3 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-h);
+}
+
+.observability-dashboard h3:not(:first-child) {
+  margin-top: 32px;
+}
+
+.observability-unavailable {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.observability-error-detail {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.trace-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.trace-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trace-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.trace-bar-count {
+  font-weight: 400;
+  color: var(--text);
+}
+
+.trace-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.trace-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.trace-bar-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.trace-error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text);
+  margin-top: 4px;
 }

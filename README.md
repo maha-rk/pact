@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-66-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-68-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
@@ -428,9 +428,9 @@ pytest tests/
 | Layer | Count | What it proves |
 |---|---|---|
 | Unit | 22 | Deterministic concession-curve math, compliance rule matching, real AES-256-GCM field encryption round-trips — no external calls |
-| Integration | 32 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing, the real Pub/Sub-decoupled negotiation path (skip-gated, needs the real emulators) |
+| Integration | 34 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing, the real Pub/Sub-decoupled negotiation path (skip-gated, needs the real emulators), the real observability dashboard endpoint against live BigQuery data |
 | E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
-| **Total** | **66** | |
+| **Total** | **68** | |
 
 None of the integration or e2e tests mock the external APIs — they hit
 real AWS, real Azure, and (when a key is configured) the real Gemini API,
@@ -479,7 +479,7 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | Gemini narration of individual negotiation moves, not just the final decision | 🔭 Designed, not yet connected |
 | GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
 | Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
-| Dashboard/alerting on top of the real trace data | 🔭 Raw table is real; visualization is not yet built |
+| Real observability dashboard (`GET /observability/summary`, frontend "Observability" view) | ✅ Implemented and tested — real SQL against `model_traces` + `negotiations` |
 
 ## Honest Limitations
 
@@ -710,6 +710,25 @@ data. What's real right now:
   evaluation harness's real aggregate SQL (§29) actually reads (a ratio,
   materially less sensitive alone than the raw dollar figures behind
   it), and the latter is deferred scope, not an oversight.
+- **Real, in-app observability dashboard** — `GET /observability/summary`
+  (`pact/api/routes_observability.py`) runs real SQL against BigQuery:
+  per-model call count/latency/tokens/error rate from `model_traces`,
+  plus the same aggregate query the evaluation harness (§29) uses
+  (agreement rate, avg rounds, avg savings %, claim-mismatch and
+  compliance-rejection catch rates) from `negotiations`/`negotiation_events`.
+  Rendered in the frontend's new "Observability" view. Read-only, never
+  raises into a 500 if BigQuery is unreachable — degrades to an honest
+  "not available" message instead, proven by
+  `tests/integration/test_observability.py`'s first test, which runs
+  unconditionally (including with no BigQuery credentials at all).
+  Building this surfaced a real, pre-existing bug: the aggregate query's
+  claim-mismatch/compliance-rejection subqueries weren't constrained to
+  `negotiation_id`s actually present in `negotiations`, so
+  `negotiation_events`' cross-session accumulation could push the rate
+  over 100% (116 distinct event `negotiation_id`s vs. 5 real
+  `negotiations` rows produced an impossible 1966% figure) — fixed in
+  both `infra/bigquery/queries_aggregate.sql` and the dashboard's own
+  copy of the query, verified against live data afterward (a sane 60%).
 
 Not yet wired into the running system — see [Roadmap](#roadmap) below,
 and `docs/PRD.md` §11's Google Technology Stack table for the intended
@@ -726,9 +745,10 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 - [ ] Managed cloud hosting once a genuinely free, cardless option exists
       (Cloud Run and Hugging Face Spaces were both evaluated and ruled
       out for requiring billing — see [Deployment](#deployment))
-- [ ] A dashboard over the real `model_traces` BigQuery table — the data
-      is real and queryable today; a visualization layer on top of it
-      isn't built yet
+- [ ] A managed, third-party observability backend (Looker Studio,
+      Grafana) or alerting on anomalous model behavior — the in-app
+      `/observability` dashboard covers real-time visualization today
+      (see [Current status](#current-status--honest-scope)), not alerting
 - [ ] Split the Verification Agent into its own standalone service too
       (Compliance is already real and split — see
       [Current status](#current-status--honest-scope)); deploy the

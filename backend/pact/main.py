@@ -18,6 +18,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from pact.api.gateway import limiter
 from pact.api.routes_auth import router as auth_router
 from pact.api.routes_negotiation import router as negotiation_router
+from pact.api.routes_observability import router as observability_router
 from pact.api.routes_requirements import router as requirements_router
 from pact.observability.tracing import configure_tracing
 
@@ -42,6 +43,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.include_router(auth_router)
 app.include_router(negotiation_router)
 app.include_router(requirements_router)
+app.include_router(observability_router)
 
 
 @app.get("/health")

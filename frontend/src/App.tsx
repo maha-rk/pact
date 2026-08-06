@@ -5,6 +5,7 @@ import type { NegotiationState } from "./types";
 import type { ParsedRequirement } from "./api";
 import { DecisionView } from "./components/DecisionView";
 import { ReplayTimeline } from "./components/ReplayTimeline";
+import { ObservabilityDashboard } from "./components/ObservabilityDashboard";
 
 // Non-standard browser API (Chrome/Edge/Safari); no official TS lib types.
 type SpeechRecognitionLike = {
@@ -30,8 +31,10 @@ const FLAGSHIP_DEFAULTS = {
 };
 
 type Tab = "decision" | "replay";
+type View = "negotiate" | "observability";
 
 function App() {
+  const [view, setView] = useState<View>("negotiate");
   const [form, setForm] = useState(FLAGSHIP_DEFAULTS);
   const [state, setState] = useState<NegotiationState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -144,8 +147,22 @@ function App() {
       <header>
         <h1>Pact</h1>
         <p className="tagline">Autonomous B2B procurement negotiation</p>
+        <nav className="top-nav">
+          <button className={view === "negotiate" ? "active" : ""} onClick={() => setView("negotiate")}>
+            Negotiate
+          </button>
+          <button className={view === "observability" ? "active" : ""} onClick={() => setView("observability")}>
+            Observability
+          </button>
+        </nav>
       </header>
 
+      {view === "observability" ? (
+        <section className="results">
+          <ObservabilityDashboard />
+        </section>
+      ) : (
+        <>
       <section className="requirement-form">
         <h2>Requirement</h2>
         <div className="intake-row">
@@ -241,6 +258,8 @@ function App() {
             <ReplayTimeline state={state} />
           )}
         </section>
+      )}
+        </>
       )}
     </div>
   );

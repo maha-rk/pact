@@ -103,3 +103,28 @@ export interface NegotiationState {
   events: NegotiationEvent[];
   decision: Decision | null;
 }
+
+// Mirrors backend/pact/api/routes_observability.py.
+export interface ModelTraceSummaryRow {
+  model: string | null;
+  call_count: number;
+  avg_latency_ms: number | null;
+  total_tokens: number | null;
+  error_rate: number | null;
+}
+
+export interface NegotiationAggregateSummary {
+  total_runs: number;
+  agreement_rate: number | null;
+  avg_rounds_to_agreement: number | null;
+  avg_savings_pct: number | null;
+  claim_mismatch_catch_rate: number | null;
+  compliance_rejection_rate: number | null;
+}
+
+export interface ObservabilitySummary {
+  available: boolean;
+  error: string | null;
+  model_traces: ModelTraceSummaryRow[];
+  negotiations: NegotiationAggregateSummary | null;
+}

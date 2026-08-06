@@ -16,18 +16,25 @@ per_negotiation_rounds AS (
     negotiation_id,
     MAX(round_number) AS rounds_to_agreement
   FROM `pact-hackathon.pact.negotiation_events`
-  WHERE event_type = 'offer_made'
+  WHERE event_type = 'offer_made' AND negotiation_id IN (SELECT negotiation_id FROM runs)
   GROUP BY negotiation_id
 ),
+-- Constrained to negotiation_ids that actually have a `runs` row --
+-- negotiation_events accumulates across every test/dev run over the
+-- project's lifetime, so without this filter these rates are computed
+-- against a much larger, unrelated event population than `runs` and can
+-- exceed 100% (caught for real: 116 distinct event negotiation_ids vs.
+-- 5 real `negotiations` rows produced an impossible 1966% figure before
+-- this fix).
 claim_catches AS (
   SELECT DISTINCT negotiation_id
   FROM `pact-hackathon.pact.negotiation_events`
-  WHERE event_type = 'claim_rejected'
+  WHERE event_type = 'claim_rejected' AND negotiation_id IN (SELECT negotiation_id FROM runs)
 ),
 compliance_catches AS (
   SELECT DISTINCT negotiation_id
   FROM `pact-hackathon.pact.negotiation_events`
-  WHERE event_type = 'compliance_rejected'
+  WHERE event_type = 'compliance_rejected' AND negotiation_id IN (SELECT negotiation_id FROM runs)
 )
 
 SELECT

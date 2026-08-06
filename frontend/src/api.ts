@@ -1,4 +1,4 @@
-import type { NegotiationState, VendorId } from "./types";
+import type { NegotiationState, ObservabilitySummary, VendorId } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
@@ -62,4 +62,8 @@ export function parseRequirementFromText(text: string): Promise<ParsedRequiremen
   return fetch(`${API_BASE}/requirements/parse-text`, { method: "POST", body }).then((r) =>
     handle<ParsedRequirement>(r)
   );
+}
+
+export function getObservabilitySummary(): Promise<ObservabilitySummary> {
+  return fetch(`${API_BASE}/observability/summary`).then((r) => handle<ObservabilitySummary>(r));
 }

@@ -170,6 +170,8 @@ flowchart TB
 
     OTEL["OpenTelemetry tracing<br/>real spans: token usage · latency ·<br/>prompt hashes · negotiation_id — PRD §23b"]
 
+    DASHBOARD["Observability Dashboard<br/>GET /observability/summary<br/>real SQL, in-app, PRD §23b"]
+
     subgraph DISTRIBUTED["Distributed execution — opt-in, PACT_DISTRIBUTED=true, off by default (PRD §23c)"]
         PUBSUB["Pub/Sub<br/>negotiation-requests topic<br/>real, tested"]
         WORKER["Negotiation Worker<br/>independently deployable,<br/>horizontally scalable<br/>runs the same run_negotiation pipeline"]
@@ -183,6 +185,7 @@ flowchart TB
     BIGQUERY --> CLOUDRUN
     MODELS --> OTEL
     OTEL --> BIGQUERY
+    BIGQUERY --> DASHBOARD
     PUBSUB --> WORKER --> COMPLIANCESVC
     WORKER --> FIRESTORE
 ```
@@ -206,6 +209,15 @@ Firestore emulators, a real worker subprocess, a real standalone
 Compliance service subprocess) and a dedicated CI job, both producing an
 identical decision to the in-process baseline. Off by default; the live
 demo runs the in-process path.
+
+**The Observability Dashboard** is real and on by default: unlike the
+distributed-execution path, `GET /observability/summary` runs live SQL
+against `model_traces` and `negotiations`/`negotiation_events` on every
+request, rendered in the frontend's "Observability" view — not a
+managed, third-party backend (Looker Studio, Grafana), but a real,
+tested, in-app one this codebase built and controls. Read-only; degrades
+to an honest "not available" message rather than a 500 if BigQuery is
+unreachable.
 
 ---
 
