@@ -1,33 +1,57 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
+  /* Neutral surface scale (Linear/Stripe-style: cool grays, not warm) */
+  --gray-50: #f8f9fb;
+  --gray-100: #f1f2f5;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #101828;
+
+  --text: var(--gray-500);
+  --text-h: var(--gray-900);
   --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
+  --bg-subtle: var(--gray-50);
+  --border: var(--gray-200);
+  --border-strong: var(--gray-300);
+  --code-bg: var(--gray-50);
+
+  --accent: #6d28d9;
+  --accent-hover: #5b21b6;
+  --accent-bg: #f5f3ff;
+  --accent-border: #ddd6fe;
+
+  --success: #059669;
+  --success-bg: #ecfdf5;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --warning: #d97706;
+  --warning-bg: #fffbeb;
+
   --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.06), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 24px -6px rgba(16, 24, 40, 0.08), 0 4px 8px -4px rgba(16, 24, 40, 0.05);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --heading: var(--sans);
+  --mono: ui-monospace, 'SF Mono', Consolas, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  font: 15px/150% var(--sans);
+  letter-spacing: 0;
   color-scheme: light;
   color: var(--text);
-  background: var(--bg);
+  background: var(--bg-subtle);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
 /* Light theme is the site's fixed, intentional look -- not adaptive to
@@ -44,34 +68,36 @@
   box-sizing: border-box;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
 }
 
 h1,
-h2 {
+h2,
+h3,
+h4 {
   font-family: var(--heading);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-h);
 }
 
 h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
+  font-size: 18px;
+  letter-spacing: -0.2px;
+  margin: 0;
 }
 h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 130%;
+  letter-spacing: -0.1px;
+  margin: 0 0 4px;
 }
 p {
   margin: 0;
@@ -86,8 +112,9 @@ code,
 }
 
 code {
-  font-size: 15px;
+  font-size: 13px;
   line-height: 135%;
-  padding: 4px 8px;
+  padding: 3px 6px;
   background: var(--code-bg);
+  border: 1px solid var(--border);
 }

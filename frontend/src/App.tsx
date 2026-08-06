@@ -33,6 +33,29 @@ const FLAGSHIP_DEFAULTS = {
 type Tab = "decision" | "replay";
 type View = "negotiate" | "observability";
 
+function IconNegotiate() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 12h8" />
+      <path d="M8 12l3-3M8 12l3 3" />
+      <path d="M16 12l-3-3M16 12l-3 3" />
+      <rect x="2" y="6" width="6" height="12" rx="1.5" />
+      <rect x="16" y="6" width="6" height="12" rx="1.5" />
+    </svg>
+  );
+}
+
+function IconChart() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19V10" />
+      <path d="M11 19V5" />
+      <path d="M18 19v-7" />
+      <path d="M3 21h18" />
+    </svg>
+  );
+}
+
 function App() {
   const [view, setView] = useState<View>("negotiate");
   const [form, setForm] = useState(FLAGSHIP_DEFAULTS);
@@ -143,124 +166,153 @@ function App() {
   };
 
   return (
-    <div className="app">
-      <header>
-        <h1>Pact</h1>
-        <p className="tagline">Autonomous B2B procurement negotiation</p>
-        <nav className="top-nav">
-          <button className={view === "negotiate" ? "active" : ""} onClick={() => setView("negotiate")}>
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <span className="brand-mark">P</span>
+          <span className="brand-name">Pact</span>
+        </div>
+        <nav className="sidebar-nav">
+          <button
+            type="button"
+            className={`nav-item ${view === "negotiate" ? "active" : ""}`}
+            onClick={() => setView("negotiate")}
+          >
+            <IconNegotiate />
             Negotiate
           </button>
-          <button className={view === "observability" ? "active" : ""} onClick={() => setView("observability")}>
+          <button
+            type="button"
+            className={`nav-item ${view === "observability" ? "active" : ""}`}
+            onClick={() => setView("observability")}
+          >
+            <IconChart />
             Observability
           </button>
         </nav>
-      </header>
+        <div className="sidebar-footer">
+          <p>Autonomous B2B procurement negotiation</p>
+        </div>
+      </aside>
 
-      {view === "observability" ? (
-        <section className="results">
-          <ObservabilityDashboard />
-        </section>
-      ) : (
-        <>
-      <section className="requirement-form">
-        <h2>Requirement</h2>
-        <div className="intake-row">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={intakeBusy || listening}
-          >
-            📷 Upload a photo of a quote/invoice
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handlePhotoUpload(file);
-            }}
-          />
-          <button type="button" onClick={handleVoiceInput} disabled={intakeBusy || listening}>
-            {listening ? "🎙️ Listening..." : "🎙️ Speak your requirement"}
-          </button>
-          {intakeBusy && <span className="intake-status">Extracting with Gemini...</span>}
-        </div>
-        {intakeStatus && <p className="intake-status">{intakeStatus}</p>}
-        {guardrailWarnings.length > 0 && (
-          <ul className="guardrail-warnings">
-            {guardrailWarnings.map((w, i) => (
-              <li key={i}>⚠️ {w}</li>
-            ))}
-          </ul>
-        )}
-        <div className="form-grid">
-          <label>
-            GPU count
-            <input
-              type="number"
-              value={form.gpu_count}
-              onChange={(e) => setForm({ ...form, gpu_count: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            Contract months
-            <input
-              type="number"
-              value={form.contract_months}
-              onChange={(e) => setForm({ ...form, contract_months: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            Budget ceiling (USD)
-            <input
-              type="number"
-              value={form.budget_ceiling_usd}
-              onChange={(e) => setForm({ ...form, budget_ceiling_usd: Number(e.target.value) })}
-            />
-          </label>
-        </div>
-        <label className="raw-input-label">
-          Requirement (as stated)
-          <input
-            type="text"
-            value={form.raw_input}
-            onChange={(e) => setForm({ ...form, raw_input: e.target.value })}
-          />
-        </label>
-        <button onClick={runNegotiation} disabled={loading}>
-          {loading ? "Negotiating..." : "Start negotiation"}
-        </button>
-        {error && <div className="error">Request failed: {error}</div>}
-        {loading && (
-          <p className="loading-note">
-            Negotiating simultaneously against every discovered vendor over
-            real HTTP, verifying claims against real pricing data...
+      <div className="main">
+        <header className="topbar">
+          <h1>{view === "negotiate" ? "Negotiate" : "Observability"}</h1>
+          <p className="topbar-subtitle">
+            {view === "negotiate"
+              ? "Discover vendors, verify claims, and settle a compliant deal — real HTTP, real pricing, real evidence."
+              : "Real OpenTelemetry spans and negotiation outcomes, queried live from BigQuery."}
           </p>
-        )}
-      </section>
+        </header>
 
-      {state && (
-        <section className="results">
-          <div className="tabs">
-            <button className={tab === "decision" ? "active" : ""} onClick={() => setTab("decision")}>
-              Decision / Evidence / Reasoning
-            </button>
-            <button className={tab === "replay" ? "active" : ""} onClick={() => setTab("replay")}>
-              Negotiation Replay ({state.events.length} events)
-            </button>
-          </div>
-          {tab === "decision" ? (
-            <DecisionView state={state} onUpdated={setState} />
+        <div className="content">
+          {view === "observability" ? (
+            <section className="panel">
+              <ObservabilityDashboard />
+            </section>
           ) : (
-            <ReplayTimeline state={state} />
+            <>
+              <section className="panel requirement-form">
+                <h2>Requirement</h2>
+                <div className="intake-row">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={intakeBusy || listening}
+                  >
+                    📷 Upload a photo of a quote/invoice
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePhotoUpload(file);
+                    }}
+                  />
+                  <button type="button" className="btn-secondary" onClick={handleVoiceInput} disabled={intakeBusy || listening}>
+                    {listening ? "🎙️ Listening..." : "🎙️ Speak your requirement"}
+                  </button>
+                  {intakeBusy && <span className="intake-status">Extracting with Gemini...</span>}
+                </div>
+                {intakeStatus && <p className="intake-status">{intakeStatus}</p>}
+                {guardrailWarnings.length > 0 && (
+                  <ul className="guardrail-warnings">
+                    {guardrailWarnings.map((w, i) => (
+                      <li key={i}>⚠️ {w}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="form-grid">
+                  <label>
+                    GPU count
+                    <input
+                      type="number"
+                      value={form.gpu_count}
+                      onChange={(e) => setForm({ ...form, gpu_count: Number(e.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    Contract months
+                    <input
+                      type="number"
+                      value={form.contract_months}
+                      onChange={(e) => setForm({ ...form, contract_months: Number(e.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    Budget ceiling (USD)
+                    <input
+                      type="number"
+                      value={form.budget_ceiling_usd}
+                      onChange={(e) => setForm({ ...form, budget_ceiling_usd: Number(e.target.value) })}
+                    />
+                  </label>
+                </div>
+                <label className="raw-input-label">
+                  Requirement (as stated)
+                  <input
+                    type="text"
+                    value={form.raw_input}
+                    onChange={(e) => setForm({ ...form, raw_input: e.target.value })}
+                  />
+                </label>
+                <button className="btn-primary" onClick={runNegotiation} disabled={loading}>
+                  {loading ? "Negotiating..." : "Start negotiation"}
+                </button>
+                {error && <div className="error">Request failed: {error}</div>}
+                {loading && (
+                  <p className="loading-note">
+                    Negotiating simultaneously against every discovered vendor over
+                    real HTTP, verifying claims against real pricing data...
+                  </p>
+                )}
+              </section>
+
+              {state && (
+                <section className="panel results">
+                  <div className="tabs">
+                    <button className={tab === "decision" ? "active" : ""} onClick={() => setTab("decision")}>
+                      Decision / Evidence / Reasoning
+                    </button>
+                    <button className={tab === "replay" ? "active" : ""} onClick={() => setTab("replay")}>
+                      Negotiation Replay ({state.events.length} events)
+                    </button>
+                  </div>
+                  {tab === "decision" ? (
+                    <DecisionView state={state} onUpdated={setState} />
+                  ) : (
+                    <ReplayTimeline state={state} />
+                  )}
+                </section>
+              )}
+            </>
           )}
-        </section>
-      )}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

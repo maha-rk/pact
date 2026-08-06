@@ -138,7 +138,7 @@ export function DecisionView({ state, onUpdated }: Props) {
               onChange={(e) => setApprover(e.target.value)}
               disabled={approving}
             />
-            <button onClick={handleApprove} disabled={approving}>
+            <button className="btn-primary" onClick={handleApprove} disabled={approving}>
               {approving ? "Approving..." : "Approve deal"}
             </button>
             {error && <div className="error">{error}</div>}
