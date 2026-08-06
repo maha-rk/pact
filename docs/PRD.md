@@ -1071,6 +1071,21 @@ section's credential-handling claim below is scoped against.
   `PACT_FIELD_ENCRYPTION_KEY` is configured; `event_type`, `vendor_id`,
   `round_number`, and `savings_pct` stay plaintext by disclosed choice
   (the evaluation harness's aggregate SQL, §29, reads them directly).
+- **Does not integrate with incumbent procurement suites (SAP Ariba,
+  Coupa, or similar), and this is a positioning choice rather than a
+  deferred feature.** Per §9, those systems digitize the *paperwork*
+  around a procurement decision — requisitions, approvals, catalogs,
+  invoice reconciliation — whereas Pact performs the negotiation and
+  claim-verification themselves. They are the incumbent Pact is
+  positioned against, not a dependency it extends. The honest
+  qualification: a real enterprise deployment would still run one of
+  those suites for downstream requisition and invoicing, so a production
+  Pact would need a handoff at the approval boundary (§21) — emitting an
+  approved, evidence-backed decision into whatever system of record the
+  buyer already operates. That handoff is a genuine integration surface
+  and is not built here; no connector to any commercial procurement
+  suite exists in this build, and none is simulated or stubbed to appear
+  to exist.
 
 ---
 

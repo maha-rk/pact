@@ -68,6 +68,13 @@ SELECT
   SUM(tokens_total) AS total_tokens,
   ROUND(SAFE_DIVIDE(COUNTIF(error), COUNT(*)), 4) AS error_rate
 FROM `{PROJECT_ID}.{DATASET_ID}.model_traces`
+-- Belt-and-suspenders alongside the exporter-side filter in
+-- observability/tracing.py: this table is documented as one row per real
+-- Gemini/Gemma call, never a raw ADK/MCP auto-instrumentation span (no
+-- `model` attribute) or a non-production trace. Keeps the dashboard --
+-- the thing meant to prove Pact's "zero fabricated numbers" claim --
+-- honest even if a future code path regresses the exporter-side filter.
+WHERE model IS NOT NULL AND model != 'fake-model'
 GROUP BY model
 ORDER BY call_count DESC
 """

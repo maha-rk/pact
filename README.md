@@ -797,6 +797,25 @@ docker run -d --name pact-deploy-run -p 7860:7860 -e GEMINI_API_KEY="<key>" pact
 ngrok http 7860
 ```
 
+To also serve **real** data on the Observability dashboard (rather than
+its honest "BigQuery isn't reachable" state), mount a read-only BigQuery
+credential at deploy time — no key is ever baked into the image itself:
+
+```bash
+docker run -d --name pact-deploy-run -p 7860:7860 \
+  -e GEMINI_API_KEY="<key>" \
+  -e GCP_PROJECT_ID=pact-hackathon \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/key.json \
+  -v /path/to/key.json:/secrets/key.json:ro \
+  pact-deploy
+```
+
+The key used for the live demo is deliberately minimal: a dedicated
+service account holding `roles/bigquery.jobUser` plus `READER` on only
+the `pact` dataset — so if it leaked, it grants read access to
+negotiation logs and nothing else in the project. Omit the mount
+entirely and the dashboard degrades gracefully instead (PRD §27).
+
 This is a real, live, working deployment — verified end to end (health
 check, frontend, and a full negotiation with correct results) over the
 actual public internet, not just localhost. Two honest caveats: it runs

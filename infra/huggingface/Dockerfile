@@ -4,14 +4,24 @@
 # behind one public port, matching what the local multi-terminal setup
 # does, just packaged into one container.
 #
-# Deliberately NOT included: GCP credentials for BigQuery. Embedding a
-# long-lived service account key in a public-facing container is a real
-# security risk this build avoids -- BigQuery logging gracefully degrades
-# here (exactly as designed for PRD §27) and only runs when the system is
-# run locally with the operator's own gcloud auth. Ollama/Gemma is local
-# machine-only for the same reason -- the deployed version's Verification
-# Agent runs the deterministic check alone (still fully correct; Gemma is
-# an independent pre-screen, never authoritative).
+# Deliberately NOT baked into the image: any GCP credential. The image
+# itself contains no key, so the artifact is safe to publish or share.
+#
+# The running container CAN be given read-only BigQuery access at deploy
+# time, by mounting a key as a volume and pointing
+# GOOGLE_APPLICATION_CREDENTIALS at it (see README's Deployment section).
+# That is what the live demo does, so the Observability dashboard shows
+# real data to anyone who opens the public URL rather than an "isn't
+# reachable" message. The key used is deliberately minimal --
+# a dedicated service account with roles/bigquery.jobUser plus READER on
+# only the `pact` dataset, so a leak exposes read access to negotiation
+# logs and nothing else in the project. Without the mount, BigQuery
+# access simply degrades gracefully (exactly as designed for PRD §27).
+#
+# Ollama/Gemma is local machine-only regardless -- the deployed
+# version's Verification Agent runs the deterministic check alone (still
+# fully correct; Gemma is an independent pre-screen, never
+# authoritative), so Gemma spans only appear when running locally.
 
 # ---- Stage 1: build the frontend ----
 FROM node:20-slim AS frontend-builder
