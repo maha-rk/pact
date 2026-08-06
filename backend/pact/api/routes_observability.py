@@ -93,6 +93,14 @@ _NEGOTIATION_AGGREGATE_SQL = f"""
 WITH runs AS (
   SELECT negotiation_id, status, final_price_usd, savings_pct, approved
   FROM `{PROJECT_ID}.{DATASET_ID}.negotiations`
+  -- Evaluation-harness runs only (PRD §29). Ad-hoc demo/API runs are
+  -- overwhelmingly the flagship happy path, so pooling them drives the
+  -- agreement rate upward toward 100% with every demo click -- measuring
+  -- how often the button was pressed, not how the system behaves. The
+  -- catalogue is a designed sample that deliberately includes no-deal
+  -- outcomes (impossible budget, blocked vendor, unmet certification),
+  -- so its proportions stay stable however many times it is re-run.
+  WHERE scenario_id IS NOT NULL
 ),
 per_negotiation_rounds AS (
   SELECT negotiation_id, MAX(round_number) AS rounds_to_agreement

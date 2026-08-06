@@ -27,7 +27,18 @@ CREATE TABLE IF NOT EXISTS `pact-hackathon.pact.negotiations` (
   reasoning STRING,
   approved BOOL,
   approved_at TIMESTAMP,
-  approved_by STRING
+  approved_by STRING,
+  -- Set only by the evaluation harness (scripts/run_catalogue.py), to the
+  -- scenario's catalogue id; NULL for live API / ad-hoc demo runs. The
+  -- distinction matters for honest statistics: the catalogue is a
+  -- designed, representative sample (deliberately including impossible
+  -- budgets, blocked vendors, unmet certifications -- i.e. real no-deal
+  -- outcomes), whereas ad-hoc runs are overwhelmingly the flagship
+  -- happy path. Pooling them makes the agreement rate drift upward
+  -- toward 100% with every demo click, which measures how often the
+  -- button was pressed rather than how the system actually behaves
+  -- (PRD §29).
+  scenario_id STRING
 );
 
 CREATE TABLE IF NOT EXISTS `pact-hackathon.pact.negotiation_events` (

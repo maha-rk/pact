@@ -98,7 +98,11 @@ def run_scenario(scenario: dict, sink_to_bigquery: bool = False) -> dict:
         initial_claimed_discounts=initial_claimed_discounts,
     )
     if sink_to_bigquery:
-        bigquery_sink.write_negotiation(state)  # same sink, same tables as the live API (PRD §25)
+        # Same sink, same tables as the live API (PRD §25) -- tagged with
+        # the scenario id so aggregate statistics can be computed over
+        # this designed, representative sample rather than being diluted
+        # by ad-hoc demo runs (see infra/bigquery/schema.sql).
+        bigquery_sink.write_negotiation(state, scenario_id=scenario["id"])
 
     compliant = state.status == NegotiationStatus.AGREED_PENDING_APPROVAL
     claim_caught = any(not r.matched for r in state.verification_results)

@@ -62,9 +62,14 @@ def _maybe_encrypted(value) -> str | None:
     return text
 
 
-def write_negotiation(state: NegotiationState) -> None:
+def write_negotiation(state: NegotiationState, scenario_id: str | None = None) -> None:
     """Writes one row to `negotiations` and one row per event to
-    `negotiation_events`. Best-effort: logs and returns on failure."""
+    `negotiation_events`. Best-effort: logs and returns on failure.
+
+    `scenario_id` is set only by the evaluation harness
+    (`scripts/run_catalogue.py`) and stays `None` for live API and
+    ad-hoc demo runs -- see `infra/bigquery/schema.sql` for why that
+    distinction is load-bearing for honest aggregate statistics."""
     try:
         client = _get_client()
         decision = state.decision
@@ -91,6 +96,7 @@ def write_negotiation(state: NegotiationState) -> None:
             "reasoning": _maybe_encrypted(decision.reasoning if decision else None),
             "approved": decision.approved if decision else False,
             "approved_at": decision.approved_at.isoformat() if decision and decision.approved_at else None,
+            "scenario_id": scenario_id,
         }
         _load_rows(client, f"{PROJECT_ID}.{DATASET_ID}.negotiations", [negotiation_row])
 
