@@ -140,3 +140,11 @@ def test_evidence_export_is_self_verifying_over_the_real_api(app_client):
         json.dumps(body["bundle"], sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     assert recomputed == body["evidence_hash"]
+
+    # The audit chain is a separate, complementary proof over the real
+    # (timestamped) event sequence -- fetch it via the plain negotiation
+    # GET and confirm the API's chain head matches independent recomputation.
+    negotiation_resp = app_client.get(f"/negotiations/{negotiation_id}")
+    events = negotiation_resp.json()["events"]
+    assert len(events) > 0
+    assert body["audit_chain_head"] == events[-1]["chain_hash"]

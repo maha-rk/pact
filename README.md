@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-74%20(68%20passed%2C%206%20skipped)-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-79%20(73%20passed%2C%206%20skipped)-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
@@ -32,6 +32,14 @@
 > [!IMPORTANT]
 > **Working-build status:** The full six-agent negotiation pipeline runs end to end against real, live AWS and Azure pricing data — no mocks in the live path.
 > **Safety boundary:** Approval records a named human decision and marks the negotiation finalized in the audit log. It never submits a purchase order, charges a payment method, or executes any external transaction.
+
+## Live Demo & Submission Links
+
+| What | Link |
+|---|---|
+| GitHub repository | [github.com/maha-rk/pact](https://github.com/maha-rk/pact) |
+| Live demo | [epidemic-either-promoter.ngrok-free.dev](https://epidemic-either-promoter.ngrok-free.dev) — free-tier ngrok tunnel; the subdomain rotates on restart, **reconfirm this URL immediately before final submission** |
+| Demo video | _— add before final submission —_ |
 
 ---
 
@@ -123,6 +131,7 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 | Policy overrides price | Budget, blocked-vendor, and certification checks that reject even the cheapest offer | Compliance is a rule, not a suggestion an optimizer can trade away |
 | Evidence-backed decisions | Decision + Evidence + Reasoning, every item traceable to a real source | Never a bare confidence score with nothing behind it |
 | Independently verifiable evidence hash | A real SHA-256 fingerprint over each negotiation's full evidence trail — exportable, and recomputable by anyone | Don't just trust what's shown on screen — download the record and check the hash yourself |
+| Hash-chained audit trail | Every logged event carries a real SHA-256 hash of itself chained to the one before it — visible per-event in the Replay tab | Tampering with any single event, at any point in the sequence, changes every hash after it, not just the one that was altered |
 | Full negotiation replay | A timestamped timeline of every offer, check, and renegotiation | An audit trail a reviewer can inspect without re-running anything |
 | Self-measuring evaluation harness | Real aggregate statistics computed via SQL from real logged runs | No claimed savings number that isn't backed by a re-runnable run |
 | Photo/voice requirement intake | Structured fields extracted from a photographed quote or a spoken transcript | Missing fields come back `null`, never an invented value |
@@ -179,8 +188,8 @@ buried at the bottom:
 
 **Verify it yourself, don't take our word for it:**
 [Real CI, every commit](https://github.com/maha-rk/pact/actions) ·
-[74 backend tests](backend/tests/) hitting real AWS/Azure/Gemini/BigQuery,
-not mocks, plus [26 frontend tests](frontend/src/) ·
+[79 backend tests](backend/tests/) hitting real AWS/Azure/Gemini/BigQuery,
+not mocks, plus [35 frontend tests](frontend/src/) ·
 [Real commit history](https://github.com/maha-rk/pact/commits/main)
 showing genuine bugs found and fixed during this build, not a single
 polished drop (see [Engineering Log](docs/ENGINEERING_LOG.md)) ·
@@ -536,10 +545,10 @@ pytest tests/
 
 | Layer | Count | What it proves |
 |---|---|---|
-| Unit | 27 | Deterministic concession-curve math, compliance rule matching, real AES-256-GCM field encryption round-trips (including negotiation event detail text), the SHA-256 evidence hash (determinism + tamper-sensitivity) — no external calls |
+| Unit | 32 | Deterministic concession-curve math, compliance rule matching, real AES-256-GCM field encryption round-trips (including negotiation event detail text), the SHA-256 evidence hash and the hash-chained audit trail (determinism + tamper-sensitivity for both) — no external calls |
 | Integration | 35 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle including the self-verifying evidence export endpoint, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing, the real Pub/Sub-decoupled negotiation path (skip-gated, needs the real emulators), the real observability dashboard endpoint against live BigQuery data |
 | E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
-| **Total** | **74** (68 passed, 6 skipped — see note below) | |
+| **Total** | **79** (73 passed, 6 skipped — see note below) | |
 
 None of the integration or e2e tests mock the external APIs — they hit
 real AWS, real Azure, and (when a key is configured) the real Gemini API,
@@ -596,7 +605,7 @@ run":
 | 11 | `certification-required-and-unmet` | A required certification neither vendor holds | No deal — rejected for that specific reason |
 
 Every row is a real assertion in `backend/tests/e2e/test_scenario_catalogue.py`
-(part of the 74-test suite in [Testing](#testing)), not just entries in
+(part of the 79-test suite in [Testing](#testing)), not just entries in
 a config file — a scenario that stopped matching its expected outcome
 would fail CI, not silently drift.
 

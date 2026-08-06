@@ -82,6 +82,7 @@ export interface NegotiationEvent {
   round_number: number | null;
   detail: string;
   timestamp: string;
+  chain_hash: string | null;
 }
 
 export type NegotiationStatus =

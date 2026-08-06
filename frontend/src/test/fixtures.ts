@@ -44,11 +44,11 @@ export function buildNegotiationState(overrides: Partial<NegotiationState> = {})
       },
     ],
     events: [
-      { event_type: "requirement_received", vendor_id: null, round_number: null, detail: "8x H100, 3mo, $115,000", timestamp: "2026-08-06T10:00:00Z" },
-      { event_type: "offer_made", vendor_id: "azure", round_number: 1, detail: "$39,246", timestamp: "2026-08-06T10:00:01Z" },
-      { event_type: "claim_rejected", vendor_id: "azure", round_number: 1, detail: "claimed 81.52% discount, actual 40%", timestamp: "2026-08-06T10:00:02Z" },
-      { event_type: "compliance_rejected", vendor_id: "aws", round_number: 1, detail: "blocked vendor", timestamp: "2026-08-06T10:00:03Z" },
-      { event_type: "decision_produced", vendor_id: "azure", round_number: null, detail: "Azure selected", timestamp: "2026-08-06T10:00:04Z" },
+      { event_type: "requirement_received", vendor_id: null, round_number: null, detail: "8x H100, 3mo, $115,000", timestamp: "2026-08-06T10:00:00Z", chain_hash: "1".repeat(64) },
+      { event_type: "offer_made", vendor_id: "azure", round_number: 1, detail: "$39,246", timestamp: "2026-08-06T10:00:01Z", chain_hash: "2".repeat(64) },
+      { event_type: "claim_rejected", vendor_id: "azure", round_number: 1, detail: "claimed 81.52% discount, actual 40%", timestamp: "2026-08-06T10:00:02Z", chain_hash: "3".repeat(64) },
+      { event_type: "compliance_rejected", vendor_id: "aws", round_number: 1, detail: "blocked vendor", timestamp: "2026-08-06T10:00:03Z", chain_hash: "4".repeat(64) },
+      { event_type: "decision_produced", vendor_id: "azure", round_number: null, detail: "Azure selected", timestamp: "2026-08-06T10:00:04Z", chain_hash: "5".repeat(64) },
     ],
     decision: {
       negotiation_id: "neg-test-1",

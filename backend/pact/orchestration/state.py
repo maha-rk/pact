@@ -45,6 +45,11 @@ class NegotiationEvent(BaseModel):
     round_number: int | None = None
     detail: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    chain_hash: str | None = None
+    """Set by `NegotiationState.log()` -- SHA-256 over this event and the
+    previous event's chain_hash (see `pact/security/audit_chain.py`).
+    None only ever transiently, before `log()` assigns it; never left
+    unset on a logged event."""
 
 
 class NegotiationStatus(str, Enum):
@@ -76,14 +81,17 @@ class NegotiationState(BaseModel):
 
     def log(self, event_type: EventType, detail: str, vendor_id: VendorId | None = None,
             round_number: int | None = None) -> None:
-        self.events.append(
-            NegotiationEvent(
-                event_type=event_type,
-                vendor_id=vendor_id,
-                round_number=round_number,
-                detail=detail,
-            )
+        from pact.security.audit_chain import GENESIS_HASH, chain_link
+
+        event = NegotiationEvent(
+            event_type=event_type,
+            vendor_id=vendor_id,
+            round_number=round_number,
+            detail=detail,
         )
+        previous = self.events[-1].chain_hash if self.events else GENESIS_HASH
+        event.chain_hash = chain_link(previous or GENESIS_HASH, event)
+        self.events.append(event)
 
     def offers_for(self, vendor_id: VendorId) -> list[Offer]:
         return [o for o in self.offers if o.vendor_id == vendor_id]

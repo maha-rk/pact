@@ -48,13 +48,27 @@ function EventRow({ event }: { event: NegotiationEvent }) {
       {event.round_number != null && <span className="round-badge">R{event.round_number}</span>}
       <span className="timeline-label">{EVENT_LABELS[event.event_type] ?? event.event_type}</span>
       <span className="timeline-detail">{event.detail}</span>
+      {event.chain_hash && (
+        <code className="timeline-chain-hash" title={`Audit chain hash: ${event.chain_hash}`}>
+          {event.chain_hash.slice(0, 8)}
+        </code>
+      )}
     </li>
   );
 }
 
 export function ReplayTimeline({ state }: { state: NegotiationState }) {
+  const chainHead = state.events.length > 0 ? state.events[state.events.length - 1].chain_hash : null;
   return (
     <div className="replay-timeline">
+      {chainHead && (
+        <p className="chain-head-note">
+          Every event above is individually hash-chained to the one before it —
+          tampering with any single event, at any point in this list, changes
+          every chain hash after it. Current chain head:{" "}
+          <code title={chainHead}>{chainHead.slice(0, 12)}…</code>
+        </p>
+      )}
       <ul>
         {state.events.map((event, i) => (
           <EventRow key={i} event={event} />

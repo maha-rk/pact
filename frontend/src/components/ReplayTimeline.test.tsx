@@ -35,11 +35,23 @@ describe("ReplayTimeline", () => {
     expect(screen.getByText("something_new")).toBeInTheDocument();
   });
 
+  it("shows the audit chain head and a per-event chain hash badge", () => {
+    const state = buildNegotiationState();
+    render(<ReplayTimeline state={state} />);
+
+    const lastEvent = state.events[state.events.length - 1];
+    expect(screen.getByTitle(lastEvent.chain_hash!)).toBeInTheDocument();
+    expect(screen.getByText(/hash-chained to the one before it/)).toBeInTheDocument();
+
+    const firstEvent = state.events[0];
+    expect(screen.getByTitle(`Audit chain hash: ${firstEvent.chain_hash}`)).toBeInTheDocument();
+  });
+
   it("renders vendor and round badges only when present on the event", () => {
     const state = buildNegotiationState({
       events: [
-        { event_type: "offer_made", vendor_id: "aws", round_number: 2, detail: "$40,000", timestamp: "2026-08-06T10:00:00Z" },
-        { event_type: "requirement_received", vendor_id: null, round_number: null, detail: "intake", timestamp: "2026-08-06T10:00:00Z" },
+        { event_type: "offer_made", vendor_id: "aws", round_number: 2, detail: "$40,000", timestamp: "2026-08-06T10:00:00Z", chain_hash: "a".repeat(64) },
+        { event_type: "requirement_received", vendor_id: null, round_number: null, detail: "intake", timestamp: "2026-08-06T10:00:00Z", chain_hash: "b".repeat(64) },
       ],
     });
     render(<ReplayTimeline state={state} />);

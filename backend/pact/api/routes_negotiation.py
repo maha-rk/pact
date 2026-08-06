@@ -205,11 +205,24 @@ def get_negotiation_evidence(negotiation_id: str) -> dict:
     `json.dumps(bundle, sort_keys=True, separators=(",", ":"))` and it
     matches `evidence_hash` below, or it doesn't (see
     `pact/security/evidence_hash.py` and
-    `tests/unit/test_evidence_hash.py`)."""
+    `tests/unit/test_evidence_hash.py`).
+
+    `audit_chain_head` is a different, complementary proof: the last
+    event's `chain_hash`, which itself depends on every earlier event's
+    real timestamp and content (see `pact/security/audit_chain.py`).
+    Recomputing it from `events` with `recompute_chain()` and comparing
+    against each event's own `chain_hash` proves the logged sequence
+    wasn't reordered, edited, or has anything missing -- a property the
+    single whole-bundle `evidence_hash` doesn't individually prove."""
     state = _store().load(negotiation_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Negotiation not found")
-    return {"negotiation_id": state.negotiation_id, "evidence_hash": state.evidence_hash, "bundle": evidence_bundle(state)}
+    return {
+        "negotiation_id": state.negotiation_id,
+        "evidence_hash": state.evidence_hash,
+        "audit_chain_head": state.events[-1].chain_hash if state.events else None,
+        "bundle": evidence_bundle(state),
+    }
 
 
 @router.post("/{negotiation_id}/approve", response_model=NegotiationState, dependencies=[Depends(require_bearer_token)])
