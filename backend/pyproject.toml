@@ -24,6 +24,8 @@ dependencies = [
     "slowapi>=0.1.9",
     "opentelemetry-api>=1.25",
     "opentelemetry-sdk>=1.25",
+    "google-cloud-pubsub>=2.21",
+    "google-cloud-firestore>=2.16",
 ]
 
 [project.optional-dependencies]

@@ -30,6 +30,45 @@ jobs:
         # everything else, including the real AWS/Azure pricing API calls,
         # runs for real against the public internet.
 
+  backend-distributed:
+    name: Backend (distributed negotiation, Pub/Sub + Firestore emulators)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e ".[dev]"
+
+      - name: Start Pub/Sub + Firestore emulators
+        run: |
+          gcloud components install pubsub-emulator beta cloud-firestore-emulator --quiet
+          gcloud beta emulators pubsub start --host-port=localhost:8085 &
+          gcloud emulators firestore start --host-port=localhost:8080 &
+          sleep 8
+
+      - name: Run distributed negotiation test
+        working-directory: backend
+        run: pytest tests/integration/test_distributed_negotiation.py -v
+        env:
+          PUBSUB_EMULATOR_HOST: localhost:8085
+          FIRESTORE_EMULATOR_HOST: localhost:8080
+        # This job is separate from "Backend (pytest)" above and does not
+        # touch it -- proves the real, opt-in Pub/Sub-decoupled
+        # negotiation path (pact/worker/negotiation_worker.py + the
+        # standalone Compliance Agent service) genuinely works, using the
+        # official local emulators for both Pub/Sub and Firestore rather
+        # than mocks. See docs/ARCHITECTURE.md.
+
   frontend:
     name: Frontend (lint, typecheck, build)
     runs-on: ubuntu-latest

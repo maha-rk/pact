@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 
+from pact.a2a.compliance_client import HttpComplianceClient
 from pact.a2a.vendor_client import HttpVendorClient, VendorUnavailableError
 from pact.agents import compliance_agent, decision_agent, discovery_agent, verification_agent
 from pact.agents.negotiation_agent import buyer_offer_at_round, vendor_offer_at_round
@@ -71,10 +72,18 @@ def run_negotiation_and_decision_phase(
     vendor_client: HttpVendorClient | None = None,
     narrator: decision_agent.Narrator | None = None,
     plausibility_screener: PlausibilityScreener | None = None,
+    compliance_client: HttpComplianceClient | None = None,
 ) -> None:
     """Negotiation Agent rounds -> Verification gate -> Compliance gate ->
     Comparison -> Decision Agent (PRD §19). Requires `state.active_vendors`
-    already populated by `run_discovery_phase`. Mutates `state` in place."""
+    already populated by `run_discovery_phase`. Mutates `state` in place.
+
+    If `compliance_client` is provided, each round's compliance check is
+    made over real HTTP against the standalone Compliance Agent service
+    (`pact/services/compliance_agent/app.py`) -- the same "real transport,
+    identical math" pattern `vendor_client` already uses for vendor
+    offers. Without it (the default), compliance is checked in-process via
+    a direct function call, exactly as today."""
     list_prices = {v: pricing_source.list_price(v, requirement) for v in state.active_vendors}
     current_claimed_discount = dict(initial_claimed_discounts)
     buyer_opening = requirement.budget_ceiling_usd * DEFAULT_BUYER_OPENING_FRACTION
@@ -167,7 +176,10 @@ def run_negotiation_and_decision_phase(
         round_compliant: list[tuple[Offer, object, object]] = []
         for offer, verification in round_price_acceptable:
             vendor_certs = agent_cards[offer.vendor_id].certifications
-            compliance = compliance_agent.check_compliance(offer, policy, vendor_certifications=vendor_certs)
+            if compliance_client is not None:
+                compliance = compliance_client.check_compliance(offer, policy, vendor_certifications=vendor_certs)
+            else:
+                compliance = compliance_agent.check_compliance(offer, policy, vendor_certifications=vendor_certs)
             state.compliance_results.append(compliance)
             if compliance.passed:
                 state.log(
@@ -237,8 +249,16 @@ def run_negotiation(
     vendor_client: HttpVendorClient | None = None,
     narrator: decision_agent.Narrator | None = None,
     plausibility_screener: PlausibilityScreener | None = None,
+    compliance_client: HttpComplianceClient | None = None,
+    negotiation_id: str | None = None,
 ) -> NegotiationState:
-    """If `vendor_client` is provided, each round's vendor offer is
+    """`negotiation_id`: pass an explicit ID when the caller must know it
+    before this function returns (the distributed API path mints one,
+    publishes it to a worker, then polls for it) -- default `None` mints
+    a fresh `uuid.uuid4()` exactly as before, unaffected for every
+    existing caller/test.
+
+    If `vendor_client` is provided, each round's vendor offer is
     fetched over real HTTP from that vendor's genuinely separate service
     (PRD §17) -- the negotiation actually happens across process/service
     boundaries, not just in-process math. Without it (e.g. fast unit/e2e
@@ -253,7 +273,7 @@ def run_negotiation(
     pipeline is a genuine, additional way to run the identical logic
     through ADK's Runner/session/event machinery, not a replacement for it."""
     state = NegotiationState(
-        negotiation_id=str(uuid.uuid4()),
+        negotiation_id=negotiation_id or str(uuid.uuid4()),
         requirement=requirement,
         policy=policy,
     )
@@ -274,5 +294,6 @@ def run_negotiation(
         vendor_client=vendor_client,
         narrator=narrator,
         plausibility_screener=plausibility_screener,
+        compliance_client=compliance_client,
     )
     return state

@@ -1,27 +1,53 @@
 """The pact-core API: what the frontend and the demo actually talk to.
 Both required UI surfaces (PRD §22, FR-10) read GET /negotiations/{id}
-and render two projections of the same record."""
+and render two projections of the same record.
+
+Two execution modes, selected by `_execution_mode()`:
+- `in_process` (default): today's exact synchronous behavior -- a
+  negotiation runs to completion inside this request, in this process.
+  Zero new infrastructure required; every existing test exercises this
+  path unchanged.
+- `distributed` (`PACT_DISTRIBUTED=true`, and only if Pub/Sub/Firestore
+  are actually reachable -- probed, not trusted, exactly like
+  `_plausibility_screener()`): negotiation execution happens in a
+  separately deployable worker process
+  (`pact/worker/negotiation_worker.py`), dispatched over real Google
+  Cloud Pub/Sub. `POST /negotiations` still returns the complete final
+  `NegotiationState` synchronously for the normal (sub-second) case, via
+  a bounded poll of the shared Firestore store -- the frontend's existing
+  contract is unchanged. See docs/ARCHITECTURE.md for the full
+  disclosure."""
 
 from __future__ import annotations
+
+import logging
+import os
+import time
+import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-import os
-
+from pact import runtime_factories
 from pact.a2a.vendor_client import HttpVendorClient
 from pact.api.gateway import limiter, require_bearer_token
 from pact.logging import bigquery_sink
+from pact.messaging import pubsub_client
 from pact.models.schemas import AgentCard, PolicyConstraints, Requirement, VendorId
 from pact.orchestration import approval
 from pact.orchestration.graph import run_negotiation
-from pact.orchestration.state import NegotiationState, NegotiationStatus
+from pact.orchestration.state import EventType, NegotiationState, NegotiationStatus
+from pact.store import negotiation_store
+from pact.store.negotiation_store import FirestoreStore, InProcessStore
+
+logger = logging.getLogger("pact.routes_negotiation")
 
 router = APIRouter(prefix="/negotiations", tags=["negotiations"])
 
-# In-memory store for this build; swapped for BigQuery-backed persistence
-# once negotiation logging (FR-9) lands -- see pact/logging/.
-_STORE: dict[str, NegotiationState] = {}
+# Backing store for the in_process execution mode -- today's exact
+# behavior (a plain in-process dict, wrapped). Must be a module-level
+# singleton, reused across requests, not recreated per call.
+_in_process_store = InProcessStore()
 
 VENDOR_ENDPOINTS = {
     VendorId.AWS: "http://localhost:9001",
@@ -50,51 +76,54 @@ class ApprovalRequest(BaseModel):
 
 
 def _pricing_source():
-    # Imported lazily so importing this router doesn't require the vendor
-    # packages to be on the path in every deployment context.
-    from vendors.aws_vendor.pricing_client import AWSPricingClient
-    from vendors.azure_vendor.pricing_client import AzurePricingClient
-
-    aws, azure = AWSPricingClient(), AzurePricingClient()
-
-    class _Combined:
-        def list_price(self, vendor_id, requirement):
-            return (aws if vendor_id == VendorId.AWS else azure).list_price(vendor_id, requirement)
-
-        def real_committed_use_discount_rate(self, vendor_id, requirement):
-            client = aws if vendor_id == VendorId.AWS else azure
-            return client.real_committed_use_discount_rate(vendor_id, requirement)
-
-        def source_label(self, vendor_id):
-            return (aws if vendor_id == VendorId.AWS else azure).source_label(vendor_id)
-
-    return _Combined()
+    return runtime_factories.pricing_source()
 
 
 def _narrator():
-    """Real Gemini narration if a key is configured; None otherwise --
-    the deterministic template fallback in decision_agent handles that
-    case gracefully (PRD §27)."""
-    if not os.environ.get("GEMINI_API_KEY"):
-        return None
-    from pact.models.gemini_client import narrate_reasoning
-
-    return narrate_reasoning
+    return runtime_factories.narrator()
 
 
 def _plausibility_screener():
-    """Real Gemma pre-screen if the local Ollama instance is reachable;
-    None otherwise -- verification's deterministic verdict never depends
-    on this (PRD §27)."""
-    import httpx
+    return runtime_factories.plausibility_screener()
 
-    try:
-        httpx.get("http://localhost:11434/api/tags", timeout=1.0).raise_for_status()
-    except Exception:
-        return None
-    from pact.models.gemma_client import plausibility_screen
 
-    return plausibility_screen
+def _execution_mode() -> str:
+    """`in_process` unless `PACT_DISTRIBUTED=true` AND Pub/Sub/Firestore
+    are actually reachable right now -- a flag alone is never trusted, the
+    same discipline `_plausibility_screener()` already applies to Ollama.
+    Unlike that best-effort fallback, this one logs loudly on downgrade:
+    silently dropping a mode someone explicitly asked for (possibly mid-
+    demo) would itself be an undisclosed-behavior problem."""
+    if os.environ.get("PACT_DISTRIBUTED", "").lower() != "true":
+        return "in_process"
+    if not (pubsub_client.is_configured() and negotiation_store.is_configured()):
+        logger.warning("PACT_DISTRIBUTED=true but Pub/Sub/Firestore are unreachable; falling back to in_process")
+        return "in_process"
+    return "distributed"
+
+
+def _store():
+    if _execution_mode() == "distributed":
+        return FirestoreStore()
+    return _in_process_store
+
+
+def _poll_store_until_terminal(store, negotiation_id: str, timeout: float = 18.0, interval: float = 0.25):
+    """Bounded poll for the distributed path -- keeps `POST /negotiations`
+    synchronous for the frontend's existing contract in the normal
+    (sub-second) case. `HttpVendorClient` already uses a 35s timeout for
+    the same class of reason (real-world pricing-API latency, caught via
+    a real CI run) -- 18s here comfortably covers that. A timeout returns
+    the still-`IN_PROGRESS` state -- an existing, valid status, an honest
+    outcome rather than a failure -- and `GET /negotiations/{id}` remains
+    the way to keep checking."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        state = store.load(negotiation_id)
+        if state is not None and state.status != NegotiationStatus.IN_PROGRESS:
+            return state
+        time.sleep(interval)
+    return store.load(negotiation_id)
 
 
 @router.post("", response_model=NegotiationState, dependencies=[Depends(require_bearer_token)])
@@ -114,28 +143,55 @@ def create_negotiation(request: Request, req: NegotiationRequest, background_tas
         required_certifications=req.required_certifications,
     )
     candidate_vendors = list(req.initial_claimed_discounts.keys())
+    store = _store()
 
-    state = run_negotiation(
-        requirement=requirement,
-        policy=policy,
-        candidate_vendors=candidate_vendors,
-        agent_cards={v: AGENT_CARDS[v] for v in candidate_vendors},
-        pricing_source=_pricing_source(),
-        initial_claimed_discounts=req.initial_claimed_discounts,
-        vendor_client=HttpVendorClient(VENDOR_ENDPOINTS),
-        narrator=_narrator(),
-        plausibility_screener=_plausibility_screener(),
-    )
-    _STORE[state.negotiation_id] = state
+    if _execution_mode() == "distributed":
+        negotiation_id = str(uuid.uuid4())
+        initial_state = NegotiationState(negotiation_id=negotiation_id, requirement=requirement, policy=policy)
+        initial_state.log(EventType.REQUIREMENT_RECEIVED, detail=requirement.raw_input)
+        store.save(initial_state)
+
+        pubsub_client.publish_negotiation_requested(
+            negotiation_id,
+            {
+                "gpu_type": req.gpu_type,
+                "gpu_count": req.gpu_count,
+                "contract_months": req.contract_months,
+                "budget_ceiling_usd": req.budget_ceiling_usd,
+                "region": req.region,
+                "raw_input": req.raw_input,
+                "blocked_vendors": [v.value for v in req.blocked_vendors],
+                "required_certifications": req.required_certifications,
+                "initial_claimed_discounts": {v.value: rate for v, rate in req.initial_claimed_discounts.items()},
+            },
+        )
+        state = _poll_store_until_terminal(store, negotiation_id)
+    else:
+        state = run_negotiation(
+            requirement=requirement,
+            policy=policy,
+            candidate_vendors=candidate_vendors,
+            agent_cards={v: AGENT_CARDS[v] for v in candidate_vendors},
+            pricing_source=_pricing_source(),
+            initial_claimed_discounts=req.initial_claimed_discounts,
+            vendor_client=HttpVendorClient(VENDOR_ENDPOINTS),
+            narrator=_narrator(),
+            plausibility_screener=_plausibility_screener(),
+        )
+        store.save(state)
+
     # BigQuery load jobs take real seconds -- never hold the API response on
     # them (PRD §27's discipline applied to latency, not just correctness).
+    # Always triggered here, in the API layer, never inside the worker's
+    # message handler -- Pub/Sub's at-least-once redelivery would otherwise
+    # produce duplicate rows on a redelivered message.
     background_tasks.add_task(bigquery_sink.write_negotiation, state)
     return state
 
 
 @router.get("/{negotiation_id}", response_model=NegotiationState)
 def get_negotiation(negotiation_id: str) -> NegotiationState:
-    state = _STORE.get(negotiation_id)
+    state = _store().load(negotiation_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Negotiation not found")
     return state
@@ -146,16 +202,18 @@ def get_negotiation(negotiation_id: str) -> NegotiationState:
 def approve_negotiation(
     request: Request, negotiation_id: str, req: ApprovalRequest, background_tasks: BackgroundTasks
 ) -> NegotiationState:
-    state = _STORE.get(negotiation_id)
+    store = _store()
+    state = store.load(negotiation_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Negotiation not found")
     if state.status != NegotiationStatus.AGREED_PENDING_APPROVAL:
         raise HTTPException(status_code=409, detail=f"Cannot approve a negotiation in status {state.status.value}")
     approval.approve(state, approved_by=req.approved_by)
+    store.save(state)
     background_tasks.add_task(bigquery_sink.write_negotiation, state)  # re-sync: records the approval too
     return state
 
 
 @router.get("", response_model=list[NegotiationState])
 def list_negotiations() -> list[NegotiationState]:
-    return list(_STORE.values())
+    return _store().list_all()

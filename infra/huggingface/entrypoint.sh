@@ -18,4 +18,20 @@ for i in $(seq 1 30); do
   sleep 0.5
 done
 
+# Real Pub/Sub-based decoupling of negotiation execution (worker +
+# standalone Compliance Agent service) -- off by default, same as
+# AUTH_REQUIRED. Only started if PACT_DISTRIBUTED=true and real GCP
+# credentials for Pub/Sub/Firestore are present; internal-only, like the
+# vendor services above (see docs/ARCHITECTURE.md).
+if [ "${PACT_DISTRIBUTED:-false}" = "true" ]; then
+  uvicorn pact.services.compliance_agent.app:app --host 127.0.0.1 --port 9101 &
+  for i in $(seq 1 30); do
+    if curl -sf http://127.0.0.1:9101/.well-known/agent.json >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.5
+  done
+  python -m pact.worker.negotiation_worker &
+fi
+
 exec uvicorn pact.main:app --host 0.0.0.0 --port "${PORT:-7860}"
