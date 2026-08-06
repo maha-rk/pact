@@ -51,7 +51,10 @@ jobs:
 
       - name: Start Pub/Sub + Firestore emulators
         run: |
-          gcloud components install pubsub-emulator beta cloud-firestore-emulator --quiet
+          # ubuntu-latest's preinstalled gcloud has its component manager
+          # disabled (apt-managed, not self-update) -- install the
+          # emulators via apt, as gcloud's own error message directs.
+          sudo apt-get install -y google-cloud-cli-pubsub-emulator google-cloud-cli-firestore-emulator
           gcloud beta emulators pubsub start --host-port=localhost:8085 &
           gcloud emulators firestore start --host-port=localhost:8080 &
           sleep 8
