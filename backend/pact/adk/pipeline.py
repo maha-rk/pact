@@ -48,6 +48,7 @@ from pact.orchestration.graph import (
     run_negotiation_and_decision_phase,
 )
 from pact.orchestration.state import EventType, NegotiationState
+from pact.security.evidence_hash import compute_evidence_hash
 
 
 class _DiscoveryPhaseAgent(BaseAgent):
@@ -166,4 +167,5 @@ async def run_negotiation_via_adk(
     ):
         pass  # each yielded ADK Event mirrors a real NegotiationState log entry (see agents above)
 
+    state.evidence_hash = compute_evidence_hash(state)
     return state

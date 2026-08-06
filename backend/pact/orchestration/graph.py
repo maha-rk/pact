@@ -18,6 +18,7 @@ from pact.mcp_tools.pricing_tool import PricingSource
 from pact.mcp_tools.verification_tool import PlausibilityScreener
 from pact.models.schemas import AgentCard, Offer, PolicyConstraints, Requirement, VendorId
 from pact.orchestration.state import EventType, NegotiationState, NegotiationStatus
+from pact.security.evidence_hash import compute_evidence_hash
 
 DEFAULT_MAX_ROUNDS = 6
 DEFAULT_BUYER_OPENING_FRACTION = 0.5
@@ -291,6 +292,7 @@ def run_negotiation(
 
     run_discovery_phase(state, candidate_vendors, agent_cards)
     if not state.active_vendors:
+        state.evidence_hash = compute_evidence_hash(state)
         return state
 
     run_negotiation_and_decision_phase(
@@ -307,4 +309,5 @@ def run_negotiation(
         compliance_client=compliance_client,
         verification_client=verification_client,
     )
+    state.evidence_hash = compute_evidence_hash(state)
     return state

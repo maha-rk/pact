@@ -102,6 +102,7 @@ export interface NegotiationState {
   compliance_results: ComplianceResult[];
   events: NegotiationEvent[];
   decision: Decision | null;
+  evidence_hash: string | null;
 }
 
 // Mirrors backend/pact/api/routes_observability.py.

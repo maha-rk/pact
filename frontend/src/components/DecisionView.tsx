@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { NegotiationState } from "../types";
-import { approveNegotiation } from "../api";
+import { approveNegotiation, evidenceExportUrl } from "../api";
 
 // PRD §22 "Key UI Surfaces": the recommended vendor and final terms, each
 // evidence item individually attributed to its real source, the
@@ -15,6 +15,32 @@ export function DecisionView({ state, onUpdated }: Props) {
   const [approving, setApproving] = useState(false);
   const [approver, setApprover] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleExportEvidence = async () => {
+    setExporting(true);
+    try {
+      const resp = await fetch(evidenceExportUrl(state.negotiation_id));
+      const body = await resp.json();
+      const blob = new Blob([JSON.stringify(body, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pact-evidence-${state.negotiation_id}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleCopyHash = async () => {
+    if (!state.evidence_hash) return;
+    await navigator.clipboard.writeText(state.evidence_hash);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   const { decision, status } = state;
 
@@ -75,6 +101,28 @@ export function DecisionView({ state, onUpdated }: Props) {
 
       <h4>Reasoning</h4>
       <p className="reasoning">{decision.reasoning}</p>
+
+      {state.evidence_hash && (
+        <div className="evidence-hash-box">
+          <h4>Verifiable Evidence</h4>
+          <p className="evidence-hash-note">
+            A real SHA-256 fingerprint over this negotiation's full evidence
+            trail. Download the record and recompute the hash yourself —
+            it will match, or it won't.
+          </p>
+          <div className="evidence-hash-row">
+            <code className="evidence-hash-value" title={state.evidence_hash}>
+              {state.evidence_hash.slice(0, 16)}…{state.evidence_hash.slice(-8)}
+            </code>
+            <button type="button" onClick={handleCopyHash} className="evidence-hash-button">
+              {copied ? "Copied" : "Copy hash"}
+            </button>
+            <button type="button" onClick={handleExportEvidence} disabled={exporting} className="evidence-hash-button">
+              {exporting ? "Exporting…" : "Download evidence"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="approval-box">
         {decision.approved ? (

@@ -108,3 +108,35 @@ def test_full_negotiation_lifecycle_over_the_real_api(app_client):
 def test_unknown_negotiation_returns_404(app_client):
     resp = app_client.get("/negotiations/does-not-exist")
     assert resp.status_code == 404
+
+
+def test_evidence_export_is_self_verifying_over_the_real_api(app_client):
+    """GET /negotiations/{id}/evidence's whole promise: recompute SHA-256
+    over the exact bundle it returns, and it matches the hash also
+    returned -- proving the record hasn't been altered, without trusting
+    the server's own claim that it hasn't."""
+    import hashlib
+    import json
+
+    create_resp = app_client.post(
+        "/negotiations",
+        json={
+            "gpu_count": 8,
+            "contract_months": 3,
+            "budget_ceiling_usd": 115000.0,
+            "raw_input": "Need 8 H100 GPUs, 3-month contract, $115,000 budget",
+            "initial_claimed_discounts": {"aws": 0.25, "azure": 0.8152},
+        },
+    )
+    negotiation_id = create_resp.json()["negotiation_id"]
+
+    evidence_resp = app_client.get(f"/negotiations/{negotiation_id}/evidence")
+    assert evidence_resp.status_code == 200
+    body = evidence_resp.json()
+    assert body["negotiation_id"] == negotiation_id
+    assert body["evidence_hash"] is not None
+
+    recomputed = hashlib.sha256(
+        json.dumps(body["bundle"], sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    assert recomputed == body["evidence_hash"]

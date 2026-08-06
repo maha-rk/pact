@@ -67,3 +67,7 @@ export function parseRequirementFromText(text: string): Promise<ParsedRequiremen
 export function getObservabilitySummary(): Promise<ObservabilitySummary> {
   return fetch(`${API_BASE}/observability/summary`).then((r) => handle<ObservabilitySummary>(r));
 }
+
+export function evidenceExportUrl(negotiationId: string): string {
+  return `${API_BASE}/negotiations/${negotiationId}/evidence`;
+}

@@ -37,6 +37,7 @@ from pact.models.schemas import AgentCard, PolicyConstraints, Requirement, Vendo
 from pact.orchestration import approval
 from pact.orchestration.graph import run_negotiation
 from pact.orchestration.state import EventType, NegotiationState, NegotiationStatus
+from pact.security.evidence_hash import evidence_bundle
 from pact.store import negotiation_store
 from pact.store.negotiation_store import FirestoreStore, InProcessStore
 
@@ -195,6 +196,20 @@ def get_negotiation(negotiation_id: str) -> NegotiationState:
     if state is None:
         raise HTTPException(status_code=404, detail="Negotiation not found")
     return state
+
+
+@router.get("/{negotiation_id}/evidence")
+def get_negotiation_evidence(negotiation_id: str) -> dict:
+    """The exact canonical bundle `evidence_hash` was computed over, plus
+    the hash itself -- self-verifying: recompute SHA-256 over
+    `json.dumps(bundle, sort_keys=True, separators=(",", ":"))` and it
+    matches `evidence_hash` below, or it doesn't (see
+    `pact/security/evidence_hash.py` and
+    `tests/unit/test_evidence_hash.py`)."""
+    state = _store().load(negotiation_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+    return {"negotiation_id": state.negotiation_id, "evidence_hash": state.evidence_hash, "bundle": evidence_bundle(state)}
 
 
 @router.post("/{negotiation_id}/approve", response_model=NegotiationState, dependencies=[Depends(require_bearer_token)])

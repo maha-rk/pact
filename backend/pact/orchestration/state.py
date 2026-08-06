@@ -68,6 +68,11 @@ class NegotiationState(BaseModel):
     compliance_results: list[ComplianceResult] = Field(default_factory=list)
     events: list[NegotiationEvent] = Field(default_factory=list)
     decision: Decision | None = None
+    evidence_hash: str | None = None
+    """Real SHA-256 over this negotiation's full evidence trail, set once
+    a decision (compliant or no-deal) is produced -- see
+    `pact/security/evidence_hash.py`. Independently recomputable from the
+    exported bundle at `GET /negotiations/{id}/evidence`."""
 
     def log(self, event_type: EventType, detail: str, vendor_id: VendorId | None = None,
             round_number: int | None = None) -> None:
