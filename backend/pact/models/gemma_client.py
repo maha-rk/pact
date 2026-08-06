@@ -40,10 +40,20 @@ def plausibility_screen(vendor_id: str, claimed_discount_rate: float, contract_m
         )
         resp.raise_for_status()
         body = resp.json()
-        if body.get("prompt_eval_count") is not None:
-            span.set_attribute("tokens.prompt", body["prompt_eval_count"])
-        if body.get("eval_count") is not None:
-            span.set_attribute("tokens.completion", body["eval_count"])
+        prompt_tokens = body.get("prompt_eval_count")
+        completion_tokens = body.get("eval_count")
+        if prompt_tokens is not None:
+            span.set_attribute("tokens.prompt", prompt_tokens)
+        if completion_tokens is not None:
+            span.set_attribute("tokens.completion", completion_tokens)
+        # Ollama reports the two halves but no total, unlike Gemini's
+        # usage_metadata -- sum them here so `tokens_total` (the column the
+        # observability dashboard actually reads) isn't null for every real
+        # Gemma call. Caught for real: 40 successful Gemma calls had prompt
+        # and completion tokens logged but showed "tokens: —" on the
+        # dashboard because only `tokens.total` was being surfaced.
+        if prompt_tokens is not None and completion_tokens is not None:
+            span.set_attribute("tokens.total", prompt_tokens + completion_tokens)
         text = (body.get("response") or "").strip()
         if not text:
             raise RuntimeError("Gemma returned an empty response")
