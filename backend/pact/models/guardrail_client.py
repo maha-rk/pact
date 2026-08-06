@@ -42,6 +42,30 @@ def _get_injection_classifier():
     return _injection_classifier
 
 
+def injection_classifier_load_error() -> str | None:
+    """`None` if the injection classifier is genuinely loadable here,
+    otherwise a description of why it isn't.
+
+    Exists so tests can tell a real detection regression apart from the
+    model simply being unreachable. `screen_text_input` deliberately
+    swallows every failure (PRD §27) so a guardrail problem never blocks
+    a negotiation -- but that also means a failed model download and a
+    missed attack look identical from the outside. They are not the same
+    thing, and a test asserting detection quality must not silently
+    become a test of HuggingFace Hub's availability.
+
+    Caught for real: this test passed three consecutive CI runs, then
+    failed with a bare `assert False` on the fourth with no guardrail
+    code changed -- GitHub's shared runner IPs get rate-limited by the
+    HF Hub far more aggressively than a developer machine, so the model
+    download intermittently fails there."""
+    try:
+        _get_injection_classifier()
+        return None
+    except Exception as exc:  # noqa: BLE001 -- reporting the reason is the point
+        return f"{type(exc).__name__}: {exc}"
+
+
 def _get_pii_analyzer():
     global _pii_analyzer
     if _pii_analyzer is None:
