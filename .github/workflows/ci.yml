@@ -104,7 +104,7 @@ jobs:
         # than mocks. See docs/ARCHITECTURE.md.
 
   frontend:
-    name: Frontend (lint, typecheck, build)
+    name: Frontend (lint, test, typecheck, build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,6 +122,10 @@ jobs:
       - name: Lint
         working-directory: frontend
         run: npm run lint
+
+      - name: Test
+        working-directory: frontend
+        run: npm test
 
       - name: Typecheck + build
         working-directory: frontend

@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-69-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-74%20(68%20passed%2C%206%20skipped)-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
@@ -469,16 +469,24 @@ pytest tests/
 
 | Layer | Count | What it proves |
 |---|---|---|
-| Unit | 23 | Deterministic concession-curve math, compliance rule matching, real AES-256-GCM field encryption round-trips (including negotiation event detail text) — no external calls |
-| Integration | 34 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing, the real Pub/Sub-decoupled negotiation path (skip-gated, needs the real emulators), the real observability dashboard endpoint against live BigQuery data |
+| Unit | 27 | Deterministic concession-curve math, compliance rule matching, real AES-256-GCM field encryption round-trips (including negotiation event detail text), the SHA-256 evidence hash (determinism + tamper-sensitivity) — no external calls |
+| Integration | 35 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle including the self-verifying evidence export endpoint, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing, the real Pub/Sub-decoupled negotiation path (skip-gated, needs the real emulators), the real observability dashboard endpoint against live BigQuery data |
 | E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
-| **Total** | **69** | |
+| **Total** | **74** (68 passed, 6 skipped — see note below) | |
 
 None of the integration or e2e tests mock the external APIs — they hit
 real AWS, real Azure, and (when a key is configured) the real Gemini API,
 which is why that layer takes a few seconds longer than a typical unit
 suite: it's proving the system works against the outside world, not
 against a stand-in for it.
+
+The 6 skips are all environment-gated, not failures: 4 need credentials
+this repo deliberately doesn't ship (`GEMINI_API_KEY`, a billed
+`GCP_PROJECT_ID` for the Vertex AI fallback), and 2 need the real Pub/Sub
+and Firestore emulators running locally (`test_distributed_negotiation.py`).
+CI runs the emulator-gated test for real in a separate job
+(`backend-distributed`) rather than skipping it — see
+`.github/workflows/ci.yml`.
 
 ## Evaluation harness
 
