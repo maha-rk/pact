@@ -54,6 +54,11 @@ jobs:
           # ubuntu-latest's preinstalled gcloud has its component manager
           # disabled (apt-managed, not self-update) -- install the
           # emulators via apt, as gcloud's own error message directs.
+          # `apt-get update` first: the runner's package index for the
+          # already-registered Google Cloud SDK apt repo is stale/empty
+          # by default, so these split component packages aren't visible
+          # without a refresh.
+          sudo apt-get update
           sudo apt-get install -y google-cloud-cli-pubsub-emulator google-cloud-cli-firestore-emulator
           gcloud beta emulators pubsub start --host-port=localhost:8085 &
           gcloud emulators firestore start --host-port=localhost:8080 &
