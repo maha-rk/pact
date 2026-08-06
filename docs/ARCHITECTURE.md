@@ -51,12 +51,12 @@ flowchart TB
     BUYER["Buyer Agent<br/>parses requirements,<br/>holds negotiation strategy<br/>(reservation price, BATNA)"]
     DISCOVERY["Discovery Agent<br/>finds Vendor Agents<br/>via A2A Agent Cards"]
     NEGOTIATION["Negotiation Agent<br/>deterministic concession-curve<br/>logic drives offers"]
-    COMPLIANCE["Compliance Agent<br/>enforces budget/policy,<br/>can reject a deal live"]
     VERIFICATION["Verification Agent<br/>cross-checks vendor claims<br/>against real external data"]
+    COMPLIANCE["Compliance Agent<br/>enforces budget/policy,<br/>can reject a deal live<br/>(real, standalone service option — PRD §23c)"]
     DECISION["Decision Agent<br/>Evidence + Reasoning output"]
 
     BUYER --> DISCOVERY --> NEGOTIATION
-    NEGOTIATION --> COMPLIANCE --> VERIFICATION --> DECISION
+    NEGOTIATION --> VERIFICATION --> COMPLIANCE --> DECISION
     VERIFICATION -.->|claim mismatch found,<br/>send back| NEGOTIATION
     COMPLIANCE -.->|deal rejected,<br/>renegotiate| NEGOTIATION
 ```
@@ -68,6 +68,19 @@ Compliance Agent finds the current best offer violates a policy constraint,
 the Negotiation Agent has to go back and negotiate again — this is what
 makes the system a genuine negotiator rather than a script that runs once
 and reports whatever it got.
+
+**Deployment note**: by default all six boxes above run inside one
+in-process orchestration graph (`pact/orchestration/graph.py`) — real,
+deterministic, and fully tested. A real, tested, opt-in alternative also
+exists: negotiation execution can run in a separately deployable worker
+process, dispatched over a real Google Cloud Pub/Sub topic, with the
+Compliance Agent further split into its own standalone service reached
+over HTTP — the same "genuinely separate process" pattern the external
+Vendor Agents already use, applied to one of Pact's own internal agents.
+Off by default (`PACT_DISTRIBUTED=true` to enable, and only if Pub/Sub and
+Firestore are actually reachable), so the live demo runs the in-process
+path shown above. See §4's Data & Infrastructure Layer diagram and PRD
+§23c for the real, tested detail.
 
 ---
 
@@ -157,12 +170,21 @@ flowchart TB
 
     OTEL["OpenTelemetry tracing<br/>real spans: token usage · latency ·<br/>prompt hashes · negotiation_id — PRD §23b"]
 
+    subgraph DISTRIBUTED["Distributed execution — opt-in, PACT_DISTRIBUTED=true, off by default (PRD §23c)"]
+        PUBSUB["Pub/Sub<br/>negotiation-requests topic<br/>real, tested"]
+        WORKER["Negotiation Worker<br/>independently deployable,<br/>horizontally scalable<br/>runs the same run_negotiation pipeline"]
+        COMPLIANCESVC["Compliance Agent Service<br/>standalone, real HTTP<br/>(mirrors the vendor-agent pattern)"]
+        FIRESTORE["Firestore<br/>shared negotiation state,<br/>bounded-polled by the API"]
+    end
+
     GEMINI -.->|fallback only, on Developer API failure| VERTEXAI
     MCP -.->|used by Discovery,<br/>Negotiation, Verification agents| MODELS
     MODELS --> CLOUDRUN
     BIGQUERY --> CLOUDRUN
     MODELS --> OTEL
     OTEL --> BIGQUERY
+    PUBSUB --> WORKER --> COMPLIANCESVC
+    WORKER --> FIRESTORE
 ```
 
 **Why Gemini and Gemma are both here, doing different jobs**: Gemma runs
@@ -173,6 +195,17 @@ and unnecessary. Gemini is reserved for the actual deep reasoning: parsing
 an ambiguous requirement, or narrating *why* a negotiation move was made in
 plain language. This is a real model-selection decision, not two models
 doing the same thing for stack-padding.
+
+**The Distributed execution subgraph** is the real, tested, opt-in
+realization of §2's "deployment note": the Negotiation Worker and the
+standalone Compliance Agent Service are genuinely separate, independently
+deployable processes, connected to the API only through Pub/Sub and
+Firestore — never through shared memory. Proven by
+`tests/integration/test_distributed_negotiation.py` (real Pub/Sub and
+Firestore emulators, a real worker subprocess, a real standalone
+Compliance service subprocess) and a dedicated CI job, both producing an
+identical decision to the in-process baseline. Off by default; the live
+demo runs the in-process path.
 
 ---
 
@@ -240,3 +273,10 @@ ways, not two separately maintained sources of truth.
   every OpenTelemetry span exports to: one row per real Gemini/Gemma/Vertex
   call, with token usage, latency, a prompt hash, and (where available) a
   correlating `negotiation_id` (PRD §23b).
+- **Distributed execution mode** — the real, tested, opt-in
+  (`PACT_DISTRIBUTED=true`, off by default) alternative to the in-process
+  orchestration graph: negotiation execution runs in a separately
+  deployable worker, dispatched over a real Google Cloud Pub/Sub topic,
+  with the Compliance Agent split into its own standalone HTTP service and
+  Firestore as the shared state store between the API and the worker
+  (PRD §23c). Not what the live demo runs.

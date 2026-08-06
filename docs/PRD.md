@@ -742,6 +742,86 @@ data itself, not asserted separately from it.
 
 ---
 
+## 23c. Distributed Negotiation Execution
+
+The six internal agents (Buyer, Discovery, Negotiation, Verification,
+Compliance, Decision) run inside one in-process orchestration graph
+(`pact/orchestration/graph.py`) by default — real, deterministic, and
+fully tested (§19), but not independently deployable on its own. A real,
+tested, opt-in alternative exists for that: negotiation execution can run
+in a separately deployable worker process, communicating with the API
+only through a real Google Cloud Pub/Sub topic, with the Compliance Agent
+further split into its own standalone service.
+
+- **Why not distribute the round loop itself**: the per-round negotiation
+  loop is in-memory, sub-second, and depends on the exact reproducibility
+  guarantee this section's own tests protect (§19, FR-4). Pub/Sub is
+  at-least-once and unordered — the wrong transport for that hot path.
+  What's genuinely decoupled instead is the boundary around one full
+  negotiation run: the API process that accepts `POST /negotiations` and
+  the process that actually executes it.
+- **The worker** (`pact/worker/negotiation_worker.py`) — an
+  independently deployable, horizontally scalable process
+  (`python -m pact.worker.negotiation_worker`) that pulls (not push — the
+  worker, like the vendor services, is never publicly reachable) from a
+  real Pub/Sub subscription and runs the same, unmodified
+  `run_negotiation` pipeline per message. Because that pipeline is
+  deterministic and the shared-state write is an idempotent `.set()`,
+  Pub/Sub's at-least-once redelivery is safe by construction — a
+  redelivered message just recomputes and overwrites the same terminal
+  result. This is genuine fault isolation: a worker crash mid-run today
+  (in-process) just breaks that one HTTP request; in distributed mode, it
+  redelivers to another worker instance instead.
+- **Compliance Agent as a standalone service**
+  (`pact/services/compliance_agent/app.py`) — the same real,
+  independently-deployed-FastAPI-process pattern already proven by the
+  external vendor agents (§17), applied to one of Pact's own internal
+  agents. Reached over real HTTP via `HttpComplianceClient`
+  (`pact/a2a/compliance_client.py`), structurally identical to
+  `HttpVendorClient`. Compliance (not Buyer/Discovery/Decision, which
+  each run 0–1 times per negotiation) is the one worth this treatment: it
+  runs repeatedly per round and drives the second demo "wow moment" —
+  the agent where independent scalability is substantively meaningful,
+  not symbolic.
+- **Shared state**: Firestore (Native mode, same `pact-hackathon` GCP
+  project already billing-enabled for the disclosed Vertex AI fallback,
+  §16) — the API pre-saves an `IN_PROGRESS` state, publishes the request,
+  and does a bounded poll (~18s, the same real-world-latency reasoning
+  behind `HttpVendorClient`'s 35s timeout) so `POST /negotiations` keeps
+  returning the complete final state synchronously in the normal
+  sub-second case — zero change to the existing frontend contract. A
+  timeout returns the still-`IN_PROGRESS` state, an existing, valid
+  status and an honest outcome, not a failure.
+- **Off by default, probed not trusted**: `PACT_DISTRIBUTED=true` alone
+  is not enough — the API checks Pub/Sub and Firestore are actually
+  reachable before routing through them, falling back to today's
+  in-process path with a loud warning log if not (unlike the silent
+  best-effort fallbacks in §16 and §23a, a downgrade here is logged
+  loudly, since silently dropping a mode someone explicitly asked for
+  would itself be an undisclosed-behavior problem). This mirrors
+  `AUTH_REQUIRED`'s and the Vertex AI fallback's existing "real, tested,
+  honestly not the default" posture — the live demo runs the in-process
+  path.
+- **Proven, not just built**: `tests/integration/test_distributed_negotiation.py`
+  runs the flagship scenario through the real distributed path (a real
+  Pub/Sub emulator, a real worker subprocess, a real standalone
+  Compliance Agent service subprocess, real Firestore) and asserts an
+  identical offer sequence and decision to the in-process baseline — the
+  actual proof the reproducibility guarantee survived the redesign. A
+  separate CI job (`backend-distributed`) runs this against the official
+  Google Cloud emulators on every push, independent of the main test
+  suite.
+- **Scope, disclosed honestly**: Verification remains an in-process call
+  in this build (its `plausibility_screener` dependency is a Python
+  callable that can't cross a process boundary without its own service
+  resolving it locally — a real, deferred piece of work, not a hidden
+  one); Buyer, Discovery, and Decision remain in-worker library calls by
+  disclosed choice, not oversight; the worker and standalone services run
+  bundled in the same demo container as the vendor services today rather
+  than as separately scaled live Cloud Run deployments.
+
+---
+
 ## 24. API and Communication Requirements
 
 - **A2A** is the transport for all negotiation messages between the
@@ -914,6 +994,19 @@ section's credential-handling claim below is scoped against.
   API lookup (§16), neither of which benefits from vector search.
   Documented here explicitly rather than silently omitted, so this reads
   as a considered decision, not an oversight.
+- Does not claim the distributed negotiation execution path (§23c) is
+  what the live demo runs — `PACT_DISTRIBUTED` defaults to `false`; the
+  demo runs the same in-process orchestration graph it always has. The
+  distributed path is real, tested (`tests/integration/test_distributed_negotiation.py`,
+  a dedicated CI job against real Google Cloud emulators), and available,
+  not a live-demo dependency.
+- Does not claim all six internal agents are independently deployable
+  today — only Compliance has been split into its own standalone service
+  (§23c). Verification, the other feedback-loop agent, remains an
+  in-process call; Buyer, Discovery, and Decision remain in-worker
+  library calls by disclosed choice (each runs 0–1 times per negotiation,
+  not per round, so splitting them adds network latency for no real
+  isolation/scaling benefit).
 
 ---
 

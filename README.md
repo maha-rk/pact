@@ -191,6 +191,7 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 | Intake guardrails | `protectai/deberta-v3-base-prompt-injection-v2` + Microsoft Presidio, both self-hosted | Prompt-injection and PII detection on both FR-1 modalities (text/voice directly; photo via a real transcription call) — no external API, no cost |
 | API Gateway | Real JWT auth (`pyjwt`) + rate limiting (`slowapi`), as `pact-core` middleware | Auth off by default, rate limiting always on — see [Security](#security) |
 | Observability | Real OpenTelemetry spans, exported to console + BigQuery | Token usage, latency, prompt hashes, and `negotiation_id` correlation on every model call |
+| Distributed execution (opt-in) | Real Google Cloud Pub/Sub + Firestore + a standalone Compliance Agent service | Negotiation execution runs in an independently deployable worker; off by default (`PACT_DISTRIBUTED`) — see [Current status](#current-status--honest-scope) |
 | Persistence & analytics | Google BigQuery | Negotiation logs, evaluation-harness statistics, and model traces |
 | Deployment | Docker (single container) + ngrok | Cardless public URL — see [Deployment](#deployment) |
 
@@ -464,6 +465,7 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | Vertex AI fallback for every Gemini call site | ✅ Implemented and tested — real fallback, not the default path |
 | Real API Gateway (JWT auth + rate limiting, as `pact-core` middleware) | ✅ Implemented and tested — auth off by default, rate limiting always on |
 | Real OpenTelemetry tracing (console + BigQuery `model_traces`) | ✅ Implemented and tested |
+| Distributed negotiation execution (real Pub/Sub worker + standalone Compliance service + Firestore) | ✅ Implemented and tested — real, off by default (`PACT_DISTRIBUTED`) |
 | Gemini narration of individual negotiation moves, not just the final decision | 🔭 Designed, not yet connected |
 | GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
 | Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
@@ -484,6 +486,10 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
   URL changes on tunnel restart.
 - No formal security certification, penetration testing, or compliance
   audit has been performed or is claimed.
+- Distributed negotiation execution only splits out the Compliance Agent
+  as a standalone service today; Verification (the other feedback-loop
+  agent) remains an in-process call, and it's off by default — the live
+  demo runs the in-process orchestration graph, not the Pub/Sub path.
 
 Transparent limitations distinguish what is genuinely working today from
 what is designed but not yet built — the full breakdown below covers
@@ -640,6 +646,34 @@ data. What's real right now:
   `pact-hackathon` project) best-effort, mirroring `bigquery_sink.py`'s
   never-raises discipline exactly. Proven in `tests/integration/test_tracing.py`
   and by the same live server run described above.
+- **Distributed negotiation execution — real Pub/Sub worker + standalone
+  Compliance Agent service + Firestore, off by default** —
+  `pact/worker/negotiation_worker.py` is an independently deployable
+  process that pulls from a real Google Cloud Pub/Sub subscription and
+  runs the same, unmodified `run_negotiation` pipeline per message; the
+  Compliance Agent is additionally split into its own standalone FastAPI
+  service (`pact/services/compliance_agent/app.py`, mirroring the
+  existing AWS/Azure vendor precedent), reached over real HTTP via
+  `HttpComplianceClient`. Firestore holds the shared negotiation state
+  between the API process and the worker — the API pre-saves an
+  `IN_PROGRESS` state, publishes the request, and does a bounded poll
+  (~18s) so `POST /negotiations` still returns the complete final result
+  synchronously in the normal sub-second case, with zero frontend
+  contract change. Gated behind `PACT_DISTRIBUTED` (probed, not
+  trusted — falls back to the in-process path with a loud warning if
+  Pub/Sub/Firestore aren't actually reachable, unlike the silent
+  best-effort fallbacks elsewhere in this list), off by default, so the
+  live demo runs the in-process orchestration graph. Proven for real by
+  `tests/integration/test_distributed_negotiation.py`, which runs the
+  flagship scenario through the real distributed path — a real Pub/Sub
+  emulator, a real worker subprocess, a real standalone Compliance
+  service subprocess, real Firestore — and asserts an identical offer
+  sequence and decision to the in-process baseline, and by a dedicated
+  `backend-distributed` CI job that runs this against the official Google
+  Cloud emulators on every push. Only Compliance is split out this way
+  today; Verification's `plausibility_screener` dependency is a Python
+  callable that can't cross a process boundary without its own service
+  resolving it locally, a real, disclosed, deferred piece of work.
 
 Not yet wired into the running system — see [Roadmap](#roadmap) below,
 and `docs/PRD.md` §11's Google Technology Stack table for the intended
@@ -659,6 +693,11 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 - [ ] A dashboard over the real `model_traces` BigQuery table — the data
       is real and queryable today; a visualization layer on top of it
       isn't built yet
+- [ ] Split the Verification Agent into its own standalone service too
+      (Compliance is already real and split — see
+      [Current status](#current-status--honest-scope)); deploy the
+      distributed worker/services as separately scaled live Cloud Run
+      deployments rather than bundled in the one demo container
 
 ```mermaid
 flowchart LR
