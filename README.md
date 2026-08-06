@@ -35,7 +35,7 @@
 
 ---
 
-## 🏆 Competition Mission
+## Competition Mission
 
 **AI Agent Builder Series 2026 Grand Finale · B2B Services · #7 Vendor Evaluation**
 
@@ -98,7 +98,7 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 
 ---
 
-## 🔍 Validation Evidence
+## Validation Evidence
 
 | Technical question | Evidence-backed answer |
 |---|---|
@@ -114,7 +114,7 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 
 ---
 
-## 💡 Why Pact Stands Out
+## Why Pact Stands Out
 
 | Capability | What you get | Why it matters |
 |---|---|---|
@@ -127,7 +127,7 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 | Self-measuring evaluation harness | Real aggregate statistics computed via SQL from real logged runs | No claimed savings number that isn't backed by a re-runnable run |
 | Photo/voice requirement intake | Structured fields extracted from a photographed quote or a spoken transcript | Missing fields come back `null`, never an invented value |
 
-### 🎯 Why Pact Doesn't Score Vendors
+### Why Pact Doesn't Score Vendors
 
 Most vendor-evaluation tools produce something like this:
 
@@ -148,7 +148,7 @@ you can check yourself — not a score you have to trust.
 
 ---
 
-## 🚫 What Pact Does Not Claim
+## What Pact Does Not Claim
 
 Every claim in this README is backed by something you can independently
 check — a real test file, a real CI run, a real live endpoint — not a
@@ -209,7 +209,7 @@ find:
 
 ---
 
-## 🧭 Canonical Product Workflow
+## Canonical Product Workflow
 
 The flagship scenario is 8× H100 GPUs, a 3-month contract, and a $115,000 budget. Pact:
 
@@ -363,7 +363,7 @@ sequenceDiagram
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 docs/                   PRD and architecture documentation
@@ -478,7 +478,7 @@ cd backend && source .venv/bin/activate
 python -m pact.mcp_tools.server   # speaks real MCP over stdio; connect any MCP client
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 | Variable | Where | Required | Description |
 |---|---|---|---|
@@ -527,7 +527,7 @@ Full policy: [SECURITY.md](SECURITY.md).
   testing, or compliance audit has been performed or is claimed
   (PRD §26).
 
-## ✅ Testing
+## Testing
 
 ```bash
 cd backend && source .venv/bin/activate
@@ -555,7 +555,7 @@ CI runs the emulator-gated test for real in a separate job
 (`backend-distributed`) rather than skipping it — see
 `.github/workflows/ci.yml`.
 
-## 📈 Evaluation harness
+## Evaluation harness
 
 ```bash
 cd backend && source .venv/bin/activate
@@ -574,6 +574,31 @@ aggregate query against actual logged data with:
 ```bash
 bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/queries_aggregate.sql
 ```
+
+Deliberately not a combinatorial sweep — a representative slice across
+the dimensions that actually change the outcome (budget tightness,
+whether a vendor's claim holds up, and which policy constraint applies),
+each one asserting a specific expected result rather than just "did it
+run":
+
+| # | Scenario | What it tests | Expected outcome |
+|---:|---|---|---|
+| 01 | `budget-comfortable-honest` | Honest vendors, budget well above market | Compliant deal |
+| 02 | `budget-tight-honest` | Honest vendors, budget at market rate | Compliant deal |
+| 03 | `budget-impossible` | No vendor can meet budget even honestly | No deal — reported, never forced |
+| 04 | `flagship-claim-mismatch` | AWS overclaims a discount; Azure is honest | Compliant deal, after the false claim is caught |
+| 05 | `both-vendors-mismatched` | Both vendors overclaim their discount | Compliant deal, after both are caught |
+| 06 | `blocked-vendor-cheapest` | The only vendor that could pass policy is blocked | No deal — never falls back to a blocked vendor |
+| 07 | `single-vendor-only` | Only one vendor is discoverable this run | Compliant deal — no hard-coded minimum vendor count |
+| 08 | `all-vendors-overpriced` | Every vendor's honest price exceeds budget | No deal |
+| 09 | `small-request-comfortable` | A 1-GPU request, not the 8-GPU flagship spec | Compliant deal — proves the system generalizes |
+| 10 | `certification-required-and-met` | A required certification both vendors hold | Compliant deal |
+| 11 | `certification-required-and-unmet` | A required certification neither vendor holds | No deal — rejected for that specific reason |
+
+Every row is a real assertion in `backend/tests/e2e/test_scenario_catalogue.py`
+(part of the 74-test suite in [Testing](#testing)), not just entries in
+a config file — a scenario that stopped matching its expected outcome
+would fail CI, not silently drift.
 
 ## Implementation Status
 
@@ -929,7 +954,7 @@ first-time visitors a one-click interstitial page before reaching the
 app. Both are disclosed limitations of the no-payment path chosen here,
 not attempts to hide them.
 
-## ❓ Technical Q&A
+## Technical Q&A
 
 <details>
 <summary><strong>How is a vendor's claim actually verified?</strong></summary>
@@ -998,7 +1023,7 @@ outcomes. Anyone can independently verify the real numbers by querying
 the same public APIs Pact uses.
 </details>
 
-## 📚 Documentation
+## Documentation
 
 | Guide | Purpose |
 |---|---|
@@ -1006,11 +1031,16 @@ the same public APIs Pact uses.
 | [Architecture](docs/ARCHITECTURE.md) | The six-agent pipeline, negotiation sequence, data/infrastructure layer, and evaluation harness pipeline, each diagrammed |
 | [Engineering Log](docs/ENGINEERING_LOG.md) | Every real bug found and fixed during this build — not a highlight reel |
 
-## 📄 License
+## License
 
 MIT — see [LICENSE](LICENSE).
 
-## 🙏 Acknowledgements
+## Author
+
+Built solo by **[Mahashri RK](https://github.com/maha-rk)** for the AI
+Agent Builder Series 2026 Grand Finale.
+
+## Acknowledgements
 
 - AI Agent Builder Series 2026 — the program this was built for
 - [AWS Price List Bulk API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) and [Azure Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices) — the real, public, keyless pricing data this whole build is grounded in
