@@ -42,7 +42,7 @@ other staying up.
 | What | Link |
 |---|---|
 | GitHub repository | [github.com/maha-rk/pact](https://github.com/maha-rk/pact) |
-| Live demo (primary) | _— add after deploying via the button below —_ · Render free tier, no card required; spins down after 15 min idle, ~1 min cold start on the next request |
+| Live demo (primary) | [pact-q2ej.onrender.com](https://pact-q2ej.onrender.com) — Render free tier, no card required; spins down after 15 min idle, ~1 min cold start on the next request |
 | Live demo (fallback) | [epidemic-either-promoter.ngrok-free.dev](https://epidemic-either-promoter.ngrok-free.dev) — always warm, but tied to the operator's machine staying on; free-tier ngrok subdomain rotates on restart, **reconfirm this URL immediately before final submission** |
 | Demo video | _— add before final submission —_ |
 
@@ -69,11 +69,11 @@ Pact turns that question into a bounded, reproducible negotiation:
 
 ```mermaid
 flowchart LR
-    A["📝 Requirement"] --> B["🔎 Discover"]
-    B --> C["🤝 Negotiate"]
-    C --> D["🔬 Verify"]
-    D --> E["🛡️ Enforce Policy"]
-    E --> F["👤 Human Decision"]
+    A["Requirement"] --> B["Discover"]
+    B --> C["Negotiate"]
+    C --> D["Verify"]
+    D --> E["Enforce Policy"]
+    E --> F["Human Decision"]
 ```
 
 This is not a vendor comparison table. It is a system that negotiates on your behalf, catches a vendor's claim that doesn't hold up against real data, rejects a deal that violates your own policy — even the cheapest one — and stops at the human-control boundary.
@@ -82,19 +82,19 @@ This is not a vendor comparison table. It is a system that negotiates on your be
 
 ```mermaid
 flowchart TD
-    subgraph today["😩 Today"]
+    subgraph today["Today"]
         direction TB
-        T1["🙋 Buyer emails vendors"] --> T2["📨 Quotes trickle in"]
-        T2 --> T3["📊 Spreadsheet comparison"]
-        T3 --> T4["🤷 Decision on trust"]
+        T1["Buyer emails vendors"] --> T2["Quotes trickle in"]
+        T2 --> T3["Spreadsheet comparison"]
+        T3 --> T4["Decision on trust"]
     end
-    subgraph pact["🤝 With Pact"]
+    subgraph pact["With Pact"]
         direction TB
-        P1["🏢 Buyer Agent"] <-->|"real HTTP, simultaneous"| P2["🏢 Vendor Agents"]
-        P2 --> P3["🔬 Verification Agent"]
-        P3 --> P4["🛡️ Compliance Agent"]
-        P4 --> P5["📋 Decision + Evidence"]
-        P5 --> P6["👤 Human Approval"]
+        P1["Buyer Agent"] <-->|"real HTTP, simultaneous"| P2["Vendor Agents"]
+        P2 --> P3["Verification Agent"]
+        P3 --> P4["Compliance Agent"]
+        P4 --> P5["Decision + Evidence"]
+        P5 --> P6["Human Approval"]
     end
 ```
 
@@ -200,7 +200,6 @@ buried at the bottom:
   for the complete, itemized breakdown of what's real versus what's
   disclosed future work.
 
-**Verify it yourself, don't take our word for it:**
 [Real CI, every commit](https://github.com/maha-rk/pact/actions) ·
 [79 backend tests](backend/tests/) hitting real AWS/Azure/Gemini/BigQuery,
 not mocks, plus [35 frontend tests](frontend/src/) ·
@@ -210,25 +209,6 @@ polished drop (see [Engineering Log](docs/ENGINEERING_LOG.md)) ·
 a live public demo — see [Deployment](#deployment) for the current URL ·
 a [SHA-256 evidence hash](#evidence--policy-gates) on every negotiation,
 independently recomputable from an exported file.
-
-**If something looks fabricated, it's a bug, not a feature — please
-open an issue.**
-
----
-
-## Risks & Mitigations
-
-The honest weak points, stated directly rather than left for a judge to
-find:
-
-| Risk | Mitigation |
-|---|---|
-| Only AWS and Azure are wired to real pricing — is "multi-vendor" overstated? | No — negotiation is genuinely simultaneous across whichever vendors are live, not sequential. GCP/RunPod are disclosed as scaffolded, not silently omitted or faked. |
-| Could the flagship outcome be hard-coded for the demo? | No — `test_reproducibility_identical_inputs_identical_outcome` proves identical inputs produce an identical result, and every negotiation now carries a SHA-256 evidence hash (see [Evidence & Policy Gates](#evidence--policy-gates)) so any run's integrity can be independently checked, not just asserted. |
-| The public demo runs on ngrok/a personal machine, not managed cloud — is that "production"? | Disclosed, and justified: this build deliberately avoids requiring payment info anywhere it can (see [Deployment](#deployment)). It's a real, working public URL over the actual internet, not a localhost-only claim. |
-| Auth is off by default — security hole? | Disclosed and scoped: no end-user accounts exist yet to protect, so enabling it would gate the demo from itself. The JWT mechanism itself is real and tested (`tests/integration/test_gateway.py`), not a placeholder — unlike naming a security control in a badge without the code behind it. |
-| The Observability dashboard shows a 100% error rate for Gemini | That's real, current, and expected — the Developer API's free tier has been genuinely exhausted by testing during this build. It's not hidden; it's the visible proof the Vertex AI fallback works, at a 2:1 ratio matching the real retry-then-failover logic. |
-| What if live external APIs are unreachable during judging? | Every failure mode degrades honestly instead of substituting an invented value — a vendor goes to "unavailable" and is disclosed, never silently faked (PRD §27, `tests/failure_path/`-equivalent coverage across the integration suite). |
 
 ---
 
@@ -274,12 +254,12 @@ The general rule these two rows illustrate — not just this one scenario:
 
 ```mermaid
 flowchart TD
-    A["💰 Vendor offer"] --> B{"Verified against<br/>real external data?"}
-    B -- No --> C["❌ Rejected — renegotiate"]
+    A["Vendor offer"] --> B{"Verified against<br/>real external data?"}
+    B -- No --> C["Rejected — renegotiate"]
     B -- Yes --> D{"Passes policy<br/>(budget, blocked vendor,<br/>certifications)?"}
-    D -- No --> E["❌ Rejected — renegotiate"]
-    D -- Yes --> F["✅ Eligible for comparison"]
-    F --> G["👤 Human approval"]
+    D -- No --> E["Rejected — renegotiate"]
+    D -- Yes --> F["Eligible for comparison"]
+    F --> G["Human approval"]
 ```
 
 Reproduce every figure above yourself with
@@ -334,11 +314,11 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 
 ```mermaid
 flowchart LR
-    USER["🙋 User<br/>typed, photo, or voice input"] --> CORE["🧠 Pact Core<br/>6-agent pipeline<br/>orchestrated via Google ADK"]
-    CORE <-->|real HTTP negotiation| AWS["☁️ AWS Vendor Agent<br/>real AWS Price List API"]
-    CORE <-->|real HTTP negotiation| AZURE["☁️ Azure Vendor Agent<br/>real Azure Retail Prices API"]
-    CORE -.->|scaffolded, not yet live| OTHER["🔌 GCP / RunPod<br/>Vendor Agents"]
-    CORE --> DECISION["📋 Decision + Evidence + Reasoning<br/>held for human approval"]
+    USER["User<br/>typed, photo, or voice input"] --> CORE["Pact Core<br/>6-agent pipeline<br/>orchestrated via Google ADK"]
+    CORE <-->|real HTTP negotiation| AWS["AWS Vendor Agent<br/>real AWS Price List API"]
+    CORE <-->|real HTTP negotiation| AZURE["Azure Vendor Agent<br/>real Azure Retail Prices API"]
+    CORE -.->|scaffolded, not yet live| OTHER["GCP / RunPod<br/>Vendor Agents"]
+    CORE --> DECISION["Decision + Evidence + Reasoning<br/>held for human approval"]
 ```
 
 The six agents (Buyer, Discovery, Negotiation, Verification, Compliance,
@@ -350,13 +330,13 @@ genuinely wired to live pricing data today:
 
 ```mermaid
 sequenceDiagram
-    participant U as 🙋 User
-    participant N as 🤝 Negotiation Agent
-    participant AWS as ☁️ AWS Vendor Agent
-    participant AZ as ☁️ Azure Vendor Agent
-    participant V as 🔬 Verification Agent
-    participant C as 🛡️ Compliance Agent
-    participant D as 📋 Decision Agent
+    participant U as User
+    participant N as Negotiation Agent
+    participant AWS as AWS Vendor Agent
+    participant AZ as Azure Vendor Agent
+    participant V as Verification Agent
+    participant C as Compliance Agent
+    participant D as Decision Agent
 
     U->>N: 8x H100 GPUs, 3-month contract, $115,000 budget
 
@@ -641,20 +621,15 @@ would fail CI, not silently drift.
 | Real OpenTelemetry tracing (console + BigQuery `model_traces`) | ✅ Implemented and tested |
 | Distributed negotiation execution (real Pub/Sub worker + standalone Compliance and Verification services + Firestore) | ✅ Implemented and tested — real, off by default (`PACT_DISTRIBUTED`) |
 | Application-level AES-256-GCM field encryption (budget, final price, reasoning, event detail) | ✅ Implemented and tested — real, off by default (`PACT_FIELD_ENCRYPTION_KEY`) |
-| Gemini narration of individual negotiation moves, not just the final decision | 🔭 Designed, not yet connected |
-| GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
-| Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
 | Real observability dashboard (`GET /observability/summary`, frontend "Observability" view) | ✅ Implemented and tested — real SQL against `model_traces` + `negotiations` |
 | Verifiable SHA-256 evidence hash per negotiation (`GET /negotiations/{id}/evidence`) | ✅ Implemented and tested — independently recomputable, no `negotiation_id` in the bundle by design |
-| Frontend component test suite (Vitest + Testing Library) | ✅ Implemented and tested — 26 tests across App, DecisionView, ReplayTimeline, ObservabilityDashboard |
+| Frontend component test suite (Vitest + Testing Library) | ✅ Implemented and tested — 35 tests across App, DecisionView, ReplayTimeline, ObservabilityDashboard, LandingPage |
 | CI lint + security gate (ruff, bandit) on every push | ✅ Implemented — real findings fixed during this build (narrowed exception assertions, dead imports, `.format()`-based SQL to keep bandit's static string-check honest), not just badges |
 
 The table above is the scannable version of what's real versus not. For
-the risks a skeptical judge would actually ask about, see
-[Risks & Mitigations](#risks--mitigations) near the top of this README.
-For the full technical detail behind every ✅ row above — what was
-built, how each piece was verified, and exactly what a "real, tested,
-off by default" claim means in each case — expand the section below.
+the full technical detail behind every ✅ row — what was built, how
+each piece was verified, and exactly what a "real, tested, off by
+default" claim means in each case — expand the section below.
 
 ## Current status / honest scope
 
@@ -917,9 +892,9 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 
 ```mermaid
 flowchart LR
-    A["✅ Working Build<br/>AWS + Azure, real data"] --> B["🔌 GCP + RunPod<br/>real vendor integrations"]
-    B --> C["☁️ Managed Hosting<br/>beyond ngrok"]
-    C --> D["🏢 Agent Commerce Network<br/>beyond cloud compute procurement"]
+    A["Working Build<br/>AWS + Azure, real data"] --> B["GCP + RunPod<br/>real vendor integrations"]
+    B --> C["Managed Hosting<br/>beyond ngrok"]
+    C --> D["Agent Commerce Network<br/>beyond cloud compute procurement"]
 ```
 
 The roadmap preserves the core invariant: **verify every claim, enforce
@@ -1076,11 +1051,6 @@ the same public APIs Pact uses.
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-## Author
-
-Built solo by **[Mahashri RK](https://github.com/maha-rk)** for the AI
-Agent Builder Series 2026 Grand Finale.
 
 ## Acknowledgements
 
