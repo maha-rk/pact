@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-56-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-66-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
@@ -192,6 +192,7 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 | API Gateway | Real JWT auth (`pyjwt`) + rate limiting (`slowapi`), as `pact-core` middleware | Auth off by default, rate limiting always on — see [Security](#security) |
 | Observability | Real OpenTelemetry spans, exported to console + BigQuery | Token usage, latency, prompt hashes, and `negotiation_id` correlation on every model call |
 | Distributed execution (opt-in) | Real Google Cloud Pub/Sub + Firestore + a standalone Compliance Agent service | Negotiation execution runs in an independently deployable worker; off by default (`PACT_DISTRIBUTED`) — see [Current status](#current-status--honest-scope) |
+| Field-level encryption (opt-in) | Real AES-256-GCM (`cryptography`), on top of BigQuery's own encryption at rest | Budget ceiling, final price, reasoning — off by default (`PACT_FIELD_ENCRYPTION_KEY`) — see [Current status](#current-status--honest-scope) |
 | Persistence & analytics | Google BigQuery | Negotiation logs, evaluation-harness statistics, and model traces |
 | Deployment | Docker (single container) + ngrok | Cardless public URL — see [Deployment](#deployment) |
 
@@ -394,6 +395,14 @@ Full policy: [SECURITY.md](SECURITY.md).
   placeholder.
 - **Real rate limiting, always on.** 20 requests/minute per client on
   every negotiation-mutating endpoint, via `slowapi`.
+- **Real, application-level AES-256-GCM field encryption**, on top of
+  BigQuery's own default encryption at rest. `pact/security/field_encryption.py`
+  encrypts the budget ceiling (this system's closest analog to a
+  reservation price/BATNA), the final negotiated price, and the Decision
+  Agent's reasoning before every BigQuery write — verified end to end
+  against the live project (written, queried back, decrypted to the
+  exact original values). Off by default (falls back to plaintext with a
+  loud warning), configured via `PACT_FIELD_ENCRYPTION_KEY`.
 - **Vendor pricing data is public by construction** — both live pricing
   sources are public, keyless APIs; no private or credentialed vendor
   data is accessed.
@@ -418,10 +427,10 @@ pytest tests/
 
 | Layer | Count | What it proves |
 |---|---|---|
-| Unit | 13 | Deterministic concession-curve math, compliance rule matching — no external calls |
-| Integration | 31 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing |
+| Unit | 22 | Deterministic concession-curve math, compliance rule matching, real AES-256-GCM field encryption round-trips — no external calls |
+| Integration | 32 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing, the real Pub/Sub-decoupled negotiation path (skip-gated, needs the real emulators) |
 | E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
-| **Total** | **56** | |
+| **Total** | **66** | |
 
 None of the integration or e2e tests mock the external APIs — they hit
 real AWS, real Azure, and (when a key is configured) the real Gemini API,
@@ -466,6 +475,7 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | Real API Gateway (JWT auth + rate limiting, as `pact-core` middleware) | ✅ Implemented and tested — auth off by default, rate limiting always on |
 | Real OpenTelemetry tracing (console + BigQuery `model_traces`) | ✅ Implemented and tested |
 | Distributed negotiation execution (real Pub/Sub worker + standalone Compliance service + Firestore) | ✅ Implemented and tested — real, off by default (`PACT_DISTRIBUTED`) |
+| Application-level AES-256-GCM field encryption (budget, final price, reasoning) | ✅ Implemented and tested — real, off by default (`PACT_FIELD_ENCRYPTION_KEY`) |
 | Gemini narration of individual negotiation moves, not just the final decision | 🔭 Designed, not yet connected |
 | GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
 | Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
@@ -674,6 +684,32 @@ data. What's real right now:
   today; Verification's `plausibility_screener` dependency is a Python
   callable that can't cross a process boundary without its own service
   resolving it locally, a real, disclosed, deferred piece of work.
+- **Application-level field encryption — real AES-256-GCM, on top of
+  BigQuery's own encryption at rest, off by default** —
+  `pact/security/field_encryption.py` encrypts `budget_ceiling_usd`,
+  `final_price_usd`, and `reasoning` before every write to BigQuery's
+  `negotiations` table, using `cryptography`'s AES-256-GCM AEAD
+  primitive directly (not Fernet, which is AES-128) — real authenticated
+  encryption, so a tampered ciphertext fails to decrypt rather than
+  silently returning corrupted data. The budget ceiling is this system's
+  closest analog to a reservation price/BATNA: the buyer's true
+  walk-away point, never revealed to a vendor during negotiation.
+  `infra/bigquery/schema.sql`'s two affected columns were changed from
+  `FLOAT64` to `STRING` to hold ciphertext, and the live `pact-hackathon`
+  table was genuinely recreated with the new schema. Verified end to
+  end, not just unit-tested: a real flagship-scenario negotiation was
+  run, written to the live table, queried back over `bq query`, and
+  decrypted to the exact original values ($115,000.0 budget,
+  $39,246.20 final price) — see `tests/unit/test_field_encryption.py`
+  and `test_bigquery_sink_encryption.py`. Configured via
+  `PACT_FIELD_ENCRYPTION_KEY` (base64-encoded 32-byte key); when unset,
+  falls back to plaintext with a loud warning log at write time,
+  disclosed rather than silent — the same posture as `AUTH_REQUIRED` and
+  `PACT_DISTRIBUTED`. `savings_pct` and `negotiation_events.detail`
+  remain unencrypted by disclosed choice: the former is what the
+  evaluation harness's real aggregate SQL (§29) actually reads (a ratio,
+  materially less sensitive alone than the raw dollar figures behind
+  it), and the latter is deferred scope, not an oversight.
 
 Not yet wired into the running system — see [Roadmap](#roadmap) below,
 and `docs/PRD.md` §11's Google Technology Stack table for the intended

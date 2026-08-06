@@ -20,6 +20,13 @@ rather than a public pull request describing the exploit.
   but genuinely implemented and tested, not a placeholder.
 - **Real rate limiting**, always on: 20 requests/minute per client on
   every negotiation-mutating endpoint.
+- **Real, application-level AES-256-GCM field encryption**
+  (`pact/security/field_encryption.py`), on top of BigQuery's own
+  encryption at rest, for the budget ceiling, final price, and reasoning
+  fields written to BigQuery. Off by default (`PACT_FIELD_ENCRYPTION_KEY`
+  unset falls back to plaintext with a loud warning), but genuinely
+  implemented and verified end to end against the live project, not a
+  placeholder.
 - **Vendor pricing data is public by construction** — both live pricing
   sources (AWS Price List Bulk API, Azure Retail Prices API) are public,
   keyless APIs; no private or credentialed vendor data is accessed.

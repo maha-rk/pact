@@ -14,6 +14,7 @@ import logging
 import os
 
 from pact.orchestration.state import NegotiationState
+from pact.security import field_encryption
 
 logger = logging.getLogger("pact.bigquery_sink")
 
@@ -40,6 +41,27 @@ def is_configured() -> bool:
         return False
 
 
+def _maybe_encrypted(value) -> str | None:
+    """Real AES-256-GCM encryption (`pact/security/field_encryption.py`)
+    for BigQuery-bound fields that are sensitive in this schema: the
+    buyer's true budget ceiling (this system's closest analog to a
+    reservation price/BATNA), the final negotiated price, and the
+    Decision Agent's reasoning text. Falls back to plaintext (stringified,
+    since the column is STRING either way) with a loud warning if
+    `PACT_FIELD_ENCRYPTION_KEY` isn't configured -- disclosed, not silent,
+    same posture as `AUTH_REQUIRED` and `PACT_DISTRIBUTED` (PRD §26)."""
+    if value is None:
+        return None
+    text = str(value)
+    if field_encryption.is_configured():
+        return field_encryption.encrypt_field(text)
+    logger.warning(
+        "PACT_FIELD_ENCRYPTION_KEY not set -- writing this BigQuery field as plaintext "
+        "(real data, just not application-level encrypted; see PRD §26)."
+    )
+    return text
+
+
 def write_negotiation(state: NegotiationState) -> None:
     """Writes one row to `negotiations` and one row per event to
     `negotiation_events`. Best-effort: logs and returns on failure."""
@@ -61,12 +83,12 @@ def write_negotiation(state: NegotiationState) -> None:
             "gpu_type": state.requirement.gpu_type,
             "gpu_count": state.requirement.gpu_count,
             "contract_months": state.requirement.contract_months,
-            "budget_ceiling_usd": state.requirement.budget_ceiling_usd,
+            "budget_ceiling_usd": _maybe_encrypted(state.requirement.budget_ceiling_usd),
             "status": state.status.value,
             "selected_vendor": decision.selected_vendor.value if decision and decision.selected_vendor else None,
-            "final_price_usd": decision.final_price_usd if decision else None,
+            "final_price_usd": _maybe_encrypted(decision.final_price_usd if decision else None),
             "savings_pct": savings_pct,
-            "reasoning": decision.reasoning if decision else None,
+            "reasoning": _maybe_encrypted(decision.reasoning if decision else None),
             "approved": decision.approved if decision else False,
             "approved_at": decision.approved_at.isoformat() if decision and decision.approved_at else None,
         }

@@ -26,6 +26,7 @@ dependencies = [
     "opentelemetry-sdk>=1.25",
     "google-cloud-pubsub>=2.21",
     "google-cloud-firestore>=2.16",
+    "cryptography>=42.0",
 ]
 
 [project.optional-dependencies]
