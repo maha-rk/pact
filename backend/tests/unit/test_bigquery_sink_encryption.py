@@ -42,3 +42,15 @@ def test_encrypts_strings_too_not_just_numbers(monkeypatch):
     result = bigquery_sink._maybe_encrypted(reasoning)
     assert reasoning not in result
     assert field_encryption.decrypt_field(result) == reasoning
+
+
+def test_event_detail_text_is_encrypted_the_same_way(monkeypatch):
+    """negotiation_events.detail is real free-text audit content that can
+    embed dollar figures -- covered by the same _maybe_encrypted helper
+    as the negotiations-table fields, not left as an unencrypted gap."""
+    monkeypatch.setenv("PACT_FIELD_ENCRYPTION_KEY", base64.urlsafe_b64encode(os.urandom(32)).decode())
+    detail = "$118,886.40 exceeds the budget ceiling of $115,000.00"
+    result = bigquery_sink._maybe_encrypted(detail)
+    assert "118,886.40" not in result
+    assert "115,000.00" not in result
+    assert field_encryption.decrypt_field(result) == detail

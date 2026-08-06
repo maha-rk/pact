@@ -767,8 +767,9 @@ Compliance, Decision) run inside one in-process orchestration graph
 fully tested (§19), but not independently deployable on its own. A real,
 tested, opt-in alternative exists for that: negotiation execution can run
 in a separately deployable worker process, communicating with the API
-only through a real Google Cloud Pub/Sub topic, with the Compliance Agent
-further split into its own standalone service.
+only through a real Google Cloud Pub/Sub topic, with both feedback-loop
+agents — Compliance and Verification — further split into their own
+standalone services.
 
 - **Why not distribute the round loop itself**: the per-round negotiation
   loop is in-memory, sub-second, and depends on the exact reproducibility
@@ -789,17 +790,23 @@ further split into its own standalone service.
   result. This is genuine fault isolation: a worker crash mid-run today
   (in-process) just breaks that one HTTP request; in distributed mode, it
   redelivers to another worker instance instead.
-- **Compliance Agent as a standalone service**
-  (`pact/services/compliance_agent/app.py`) — the same real,
+- **Compliance and Verification Agents as standalone services**
+  (`pact/services/compliance_agent/app.py`,
+  `pact/services/verification_agent/app.py`) — the same real,
   independently-deployed-FastAPI-process pattern already proven by the
-  external vendor agents (§17), applied to one of Pact's own internal
-  agents. Reached over real HTTP via `HttpComplianceClient`
-  (`pact/a2a/compliance_client.py`), structurally identical to
-  `HttpVendorClient`. Compliance (not Buyer/Discovery/Decision, which
-  each run 0–1 times per negotiation) is the one worth this treatment: it
-  runs repeatedly per round and drives the second demo "wow moment" —
-  the agent where independent scalability is substantively meaningful,
-  not symbolic.
+  external vendor agents (§17), applied to both of Pact's feedback-loop
+  agents. Reached over real HTTP via `HttpComplianceClient` /
+  `HttpVerificationClient` (`pact/a2a/`), structurally identical to
+  `HttpVendorClient`. These two (not Buyer/Discovery/Decision, which
+  each run 0–1 times per negotiation) are the ones worth this treatment:
+  both run repeatedly per round and drive the demo's two "wow
+  moments" — the agents where independent scalability is substantively
+  meaningful, not symbolic. The Verification service resolves its own
+  `pricing_source()` and `plausibility_screener()` locally via
+  `pact/runtime_factories.py`, since neither a `PricingSource` object nor
+  a screener callable can cross a real process boundary — the standalone
+  service can't simply receive what the in-process call receives, it has
+  to reconstruct its own dependencies the same way the API/worker do.
 - **Shared state**: Firestore (Native mode, same `pact-hackathon` GCP
   project already billing-enabled for the disclosed Vertex AI fallback,
   §16) — the API pre-saves an `IN_PROGRESS` state, publishes the request,
@@ -821,21 +828,26 @@ further split into its own standalone service.
   path.
 - **Proven, not just built**: `tests/integration/test_distributed_negotiation.py`
   runs the flagship scenario through the real distributed path (a real
-  Pub/Sub emulator, a real worker subprocess, a real standalone
-  Compliance Agent service subprocess, real Firestore) and asserts an
-  identical offer sequence and decision to the in-process baseline — the
-  actual proof the reproducibility guarantee survived the redesign. A
-  separate CI job (`backend-distributed`) runs this against the official
-  Google Cloud emulators on every push, independent of the main test
-  suite.
-- **Scope, disclosed honestly**: Verification remains an in-process call
-  in this build (its `plausibility_screener` dependency is a Python
-  callable that can't cross a process boundary without its own service
-  resolving it locally — a real, deferred piece of work, not a hidden
-  one); Buyer, Discovery, and Decision remain in-worker library calls by
-  disclosed choice, not oversight; the worker and standalone services run
-  bundled in the same demo container as the vendor services today rather
-  than as separately scaled live Cloud Run deployments.
+  Pub/Sub emulator, a real worker subprocess, real standalone Compliance
+  and Verification Agent service subprocesses, real Firestore) and
+  asserts an identical offer sequence and decision to the in-process
+  baseline, plus that both agents' real HTTP boundary was genuinely
+  exercised — the actual proof the reproducibility guarantee survived the
+  redesign. Each test run mints a fresh `negotiation_id`, not a fixed
+  one, so the assertion can't accidentally pass against a stale Firestore
+  document left over from an earlier run — a real bug caught during this
+  build (a fixed test ID's first, genuinely-fast pass turned out to be
+  reading 2-year-old emulator state, not proving anything about the code
+  under test). A separate CI job (`backend-distributed`) runs this
+  against the official Google Cloud emulators on every push, independent
+  of the main test suite.
+- **Scope, disclosed honestly**: Buyer, Discovery, and Decision remain
+  in-worker library calls by disclosed choice, not oversight — each runs
+  0–1 times per negotiation, not per round, so splitting them into
+  services would add network latency for no real isolation/scaling
+  benefit; the worker and standalone services run bundled in the same
+  demo container as the vendor services today rather than as separately
+  scaled live Cloud Run deployments.
 
 ---
 
@@ -895,13 +907,16 @@ section's credential-handling claim below is scoped against.
   `AUTH_REQUIRED` and `PACT_DISTRIBUTED`. `savings_pct` stays plaintext
   deliberately: it's the field the evaluation harness's aggregate SQL
   (§29) actually reads, and a ratio is materially less sensitive alone
-  than the raw dollar figures it's derived from.
+  than the raw dollar figures it's derived from. `negotiation_events.detail`
+  (the freeform per-event audit text, which can embed real dollar
+  figures — e.g. "$118,886.40 exceeds the budget ceiling of $115,000.00")
+  is covered by the same `_maybe_encrypted()` helper; `event_type`,
+  `vendor_id`, and `round_number` stay plaintext since the evaluation
+  harness's aggregate SQL filters on `event_type` and losing that would
+  break real, working statistics for a field that isn't free text anyway.
 - **Explicit non-claim**: this product does not claim formal security
   certification, penetration testing, or compliance audit of any kind —
-  none has been performed, and none is claimed. Nor does it claim every
-  BigQuery field is encrypted — `negotiation_events.detail` (the
-  freeform per-event audit text) is not yet covered, a disclosed, deferred
-  scope choice, not an oversight.
+  none has been performed, and none is claimed.
 
 ---
 
@@ -1044,17 +1059,18 @@ section's credential-handling claim below is scoped against.
   a dedicated CI job against real Google Cloud emulators), and available,
   not a live-demo dependency.
 - Does not claim all six internal agents are independently deployable
-  today — only Compliance has been split into its own standalone service
-  (§23c). Verification, the other feedback-loop agent, remains an
-  in-process call; Buyer, Discovery, and Decision remain in-worker
-  library calls by disclosed choice (each runs 0–1 times per negotiation,
-  not per round, so splitting them adds network latency for no real
-  isolation/scaling benefit).
+  today — Compliance and Verification, the two feedback-loop agents,
+  have been split into their own standalone services (§23c); Buyer,
+  Discovery, and Decision remain in-worker library calls by disclosed
+  choice (each runs 0–1 times per negotiation, not per round, so
+  splitting them adds network latency for no real isolation/scaling
+  benefit).
 - Does not claim every BigQuery field is application-level encrypted
-  (§26) — `budget_ceiling_usd`, `final_price_usd`, and `reasoning` in the
-  `negotiations` table are real AES-256-GCM ciphertext when
-  `PACT_FIELD_ENCRYPTION_KEY` is configured; `negotiation_events.detail`
-  is not yet covered, a disclosed, deferred scope choice.
+  (§26) — `budget_ceiling_usd`, `final_price_usd`, `reasoning`, and
+  `negotiation_events.detail` are real AES-256-GCM ciphertext when
+  `PACT_FIELD_ENCRYPTION_KEY` is configured; `event_type`, `vendor_id`,
+  `round_number`, and `savings_pct` stay plaintext by disclosed choice
+  (the evaluation harness's aggregate SQL, §29, reads them directly).
 
 ---
 

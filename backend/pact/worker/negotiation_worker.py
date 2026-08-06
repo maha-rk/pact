@@ -26,6 +26,7 @@ import os
 
 from pact import runtime_factories
 from pact.a2a.compliance_client import HttpComplianceClient
+from pact.a2a.verification_client import HttpVerificationClient
 from pact.messaging import pubsub_client
 from pact.models.schemas import AgentCard, PolicyConstraints, Requirement, VendorId
 from pact.orchestration.graph import run_negotiation
@@ -34,6 +35,7 @@ from pact.store.negotiation_store import FirestoreStore
 logger = logging.getLogger("pact.negotiation_worker")
 
 COMPLIANCE_SERVICE_ENDPOINT = os.environ.get("PACT_COMPLIANCE_SERVICE_URL", "http://localhost:9101")
+VERIFICATION_SERVICE_ENDPOINT = os.environ.get("PACT_VERIFICATION_SERVICE_URL", "http://localhost:9102")
 
 VENDOR_ENDPOINTS = {
     VendorId.AWS: "http://localhost:9001",
@@ -78,6 +80,7 @@ def _handle_message(message) -> None:
             narrator=runtime_factories.narrator(),
             plausibility_screener=runtime_factories.plausibility_screener(),
             compliance_client=HttpComplianceClient(COMPLIANCE_SERVICE_ENDPOINT),
+            verification_client=HttpVerificationClient(VERIFICATION_SERVICE_ENDPOINT),
             negotiation_id=negotiation_id,
         )
         FirestoreStore().save(state)

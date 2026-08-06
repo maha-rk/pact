@@ -51,7 +51,7 @@ flowchart TB
     BUYER["Buyer Agent<br/>parses requirements,<br/>holds negotiation strategy<br/>(reservation price, BATNA)"]
     DISCOVERY["Discovery Agent<br/>finds Vendor Agents<br/>via A2A Agent Cards"]
     NEGOTIATION["Negotiation Agent<br/>deterministic concession-curve<br/>logic drives offers"]
-    VERIFICATION["Verification Agent<br/>cross-checks vendor claims<br/>against real external data"]
+    VERIFICATION["Verification Agent<br/>cross-checks vendor claims<br/>against real external data<br/>(real, standalone service option — PRD §23c)"]
     COMPLIANCE["Compliance Agent<br/>enforces budget/policy,<br/>can reject a deal live<br/>(real, standalone service option — PRD §23c)"]
     DECISION["Decision Agent<br/>Evidence + Reasoning output"]
 
@@ -73,10 +73,11 @@ and reports whatever it got.
 in-process orchestration graph (`pact/orchestration/graph.py`) — real,
 deterministic, and fully tested. A real, tested, opt-in alternative also
 exists: negotiation execution can run in a separately deployable worker
-process, dispatched over a real Google Cloud Pub/Sub topic, with the
-Compliance Agent further split into its own standalone service reached
-over HTTP — the same "genuinely separate process" pattern the external
-Vendor Agents already use, applied to one of Pact's own internal agents.
+process, dispatched over a real Google Cloud Pub/Sub topic, with both
+feedback-loop agents — Compliance and Verification — further split into
+their own standalone services reached over HTTP — the same "genuinely
+separate process" pattern the external Vendor Agents already use,
+applied to two of Pact's own internal agents.
 Off by default (`PACT_DISTRIBUTED=true` to enable, and only if Pub/Sub and
 Firestore are actually reachable), so the live demo runs the in-process
 path shown above. See §4's Data & Infrastructure Layer diagram and PRD
@@ -176,6 +177,7 @@ flowchart TB
         PUBSUB["Pub/Sub<br/>negotiation-requests topic<br/>real, tested"]
         WORKER["Negotiation Worker<br/>independently deployable,<br/>horizontally scalable<br/>runs the same run_negotiation pipeline"]
         COMPLIANCESVC["Compliance Agent Service<br/>standalone, real HTTP<br/>(mirrors the vendor-agent pattern)"]
+        VERIFICATIONSVC["Verification Agent Service<br/>standalone, real HTTP<br/>resolves its own pricing source +<br/>plausibility screener locally"]
         FIRESTORE["Firestore<br/>shared negotiation state,<br/>bounded-polled by the API"]
     end
 
@@ -187,6 +189,7 @@ flowchart TB
     OTEL --> BIGQUERY
     BIGQUERY --> DASHBOARD
     PUBSUB --> WORKER --> COMPLIANCESVC
+    WORKER --> VERIFICATIONSVC
     WORKER --> FIRESTORE
 ```
 
@@ -201,14 +204,16 @@ doing the same thing for stack-padding.
 
 **The Distributed execution subgraph** is the real, tested, opt-in
 realization of §2's "deployment note": the Negotiation Worker and the
-standalone Compliance Agent Service are genuinely separate, independently
-deployable processes, connected to the API only through Pub/Sub and
-Firestore — never through shared memory. Proven by
+standalone Compliance and Verification Agent Services are genuinely
+separate, independently deployable processes, connected to the API only
+through Pub/Sub and Firestore — never through shared memory. Proven by
 `tests/integration/test_distributed_negotiation.py` (real Pub/Sub and
-Firestore emulators, a real worker subprocess, a real standalone
-Compliance service subprocess) and a dedicated CI job, both producing an
-identical decision to the in-process baseline. Off by default; the live
-demo runs the in-process path.
+Firestore emulators, a real worker subprocess, real standalone
+Compliance and Verification service subprocesses, a fresh negotiation ID
+minted per test run so the assertion can't accidentally read a stale
+Firestore document from an earlier run) and a dedicated CI job, both
+producing an identical decision to the in-process baseline. Off by
+default; the live demo runs the in-process path.
 
 **The Observability Dashboard** is real and on by default: unlike the
 distributed-execution path, `GET /observability/summary` runs live SQL
@@ -289,6 +294,6 @@ ways, not two separately maintained sources of truth.
   (`PACT_DISTRIBUTED=true`, off by default) alternative to the in-process
   orchestration graph: negotiation execution runs in a separately
   deployable worker, dispatched over a real Google Cloud Pub/Sub topic,
-  with the Compliance Agent split into its own standalone HTTP service and
-  Firestore as the shared state store between the API and the worker
-  (PRD §23c). Not what the live demo runs.
+  with the Compliance and Verification Agents split into their own
+  standalone HTTP services and Firestore as the shared state store
+  between the API and the worker (PRD §23c). Not what the live demo runs.

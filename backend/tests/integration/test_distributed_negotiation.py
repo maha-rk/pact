@@ -1,9 +1,10 @@
 """Proves the real distributed path (a real Pub/Sub message, a real
-`negotiation_worker` subprocess, a real standalone Compliance Agent
-service subprocess, real Firestore read/write) produces an identical
-decision and offer sequence to the in-process baseline for the flagship
-scenario -- the actual proof that decoupling negotiation execution via
-Pub/Sub did not sacrifice the reproducibility guarantee
+`negotiation_worker` subprocess, real standalone Compliance and
+Verification Agent service subprocesses, real Firestore read/write)
+produces an identical decision and offer sequence to the in-process
+baseline for the flagship scenario -- the actual proof that decoupling
+negotiation execution via Pub/Sub did not sacrifice the reproducibility
+guarantee
 (`tests/e2e/test_flagship_scenario.py::test_reproducibility_identical_inputs_identical_outcome`).
 
 Requires the official Google Cloud Pub/Sub and Firestore emulators
@@ -28,6 +29,7 @@ import socket
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 import httpx
@@ -79,10 +81,12 @@ def distributed_negotiation():
     pubsub_client.ensure_topic_and_subscription()
 
     compliance_port = _free_port()
+    verification_port = _free_port()
     worker_env = {
         **os.environ,
         "PACT_FIXTURE_MODE": "true",
         "PACT_COMPLIANCE_SERVICE_URL": f"http://127.0.0.1:{compliance_port}",
+        "PACT_VERIFICATION_SERVICE_URL": f"http://127.0.0.1:{verification_port}",
     }
 
     procs = [
@@ -90,8 +94,13 @@ def distributed_negotiation():
             [sys.executable, "-m", "uvicorn", "pact.services.compliance_agent.app:app", "--port", str(compliance_port)],
             cwd=BACKEND_ROOT, env=worker_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         ),
+        subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "pact.services.verification_agent.app:app", "--port", str(verification_port)],
+            cwd=BACKEND_ROOT, env=worker_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        ),
     ]
     _wait_for_http(compliance_port, "/.well-known/agent.json")
+    _wait_for_http(verification_port, "/.well-known/agent.json")
 
     procs.append(
         subprocess.Popen(
@@ -102,7 +111,12 @@ def distributed_negotiation():
     time.sleep(2.0)  # let the worker's subscriber attach before we publish
 
     requirement = flagship_requirement()
-    negotiation_id = "distributed-test-flagship"
+    # A fresh ID every run, not a fixed string: the Firestore emulator
+    # persists documents for its whole process lifetime (across separate
+    # pytest invocations too), so a fixed ID risks reading a stale
+    # terminal document from an earlier run instead of proving *this*
+    # run's worker/services actually executed.
+    negotiation_id = f"distributed-test-flagship-{uuid.uuid4()}"
     store = FirestoreStore()
 
     try:
@@ -173,7 +187,8 @@ def test_distributed_path_reaches_the_same_decision_as_in_process(distributed_ne
     assert distributed_state.decision.final_price_usd == baseline_state.decision.final_price_usd
 
     # And the actual reviewer-facing claim: at least one compliance check
-    # in the distributed run really did cross a real HTTP boundary to the
-    # standalone Compliance Agent service, not just call the same Python
-    # function in-process.
+    # AND at least one verification check in the distributed run really
+    # did cross a real HTTP boundary to their standalone agent services,
+    # not just call the same Python function in-process.
     assert len(distributed_state.compliance_results) >= 1
+    assert len(distributed_state.verification_results) >= 1

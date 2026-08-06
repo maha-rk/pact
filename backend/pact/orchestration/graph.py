@@ -11,6 +11,7 @@ import uuid
 
 from pact.a2a.compliance_client import HttpComplianceClient
 from pact.a2a.vendor_client import HttpVendorClient, VendorUnavailableError
+from pact.a2a.verification_client import HttpVerificationClient
 from pact.agents import compliance_agent, decision_agent, discovery_agent, verification_agent
 from pact.agents.negotiation_agent import buyer_offer_at_round, vendor_offer_at_round
 from pact.mcp_tools.pricing_tool import PricingSource
@@ -73,17 +74,22 @@ def run_negotiation_and_decision_phase(
     narrator: decision_agent.Narrator | None = None,
     plausibility_screener: PlausibilityScreener | None = None,
     compliance_client: HttpComplianceClient | None = None,
+    verification_client: HttpVerificationClient | None = None,
 ) -> None:
     """Negotiation Agent rounds -> Verification gate -> Compliance gate ->
     Comparison -> Decision Agent (PRD §19). Requires `state.active_vendors`
     already populated by `run_discovery_phase`. Mutates `state` in place.
 
-    If `compliance_client` is provided, each round's compliance check is
-    made over real HTTP against the standalone Compliance Agent service
-    (`pact/services/compliance_agent/app.py`) -- the same "real transport,
-    identical math" pattern `vendor_client` already uses for vendor
-    offers. Without it (the default), compliance is checked in-process via
-    a direct function call, exactly as today."""
+    If `compliance_client`/`verification_client` are provided, each
+    round's compliance/verification check is made over real HTTP against
+    the corresponding standalone agent service (`pact/services/`) -- the
+    same "real transport, identical math" pattern `vendor_client` already
+    uses for vendor offers. Without them (the default), both are checked
+    in-process via a direct function call, exactly as today. When
+    `verification_client` is used, `pricing_source` and
+    `plausibility_screener` are resolved by the standalone service
+    itself, not passed across the wire (a `PricingSource` object and a
+    screener callable can't cross a real process boundary)."""
     list_prices = {v: pricing_source.list_price(v, requirement) for v in state.active_vendors}
     current_claimed_discount = dict(initial_claimed_discounts)
     buyer_opening = requirement.budget_ceiling_usd * DEFAULT_BUYER_OPENING_FRACTION
@@ -131,9 +137,12 @@ def run_negotiation_and_decision_phase(
             )
 
             # --- Verification gate: every claim checked, every round (FR-5) ---
-            result = verification_agent.verify(
-                offer, requirement, pricing_source, plausibility_screener=plausibility_screener
-            )
+            if verification_client is not None:
+                result = verification_client.verify(offer, requirement)
+            else:
+                result = verification_agent.verify(
+                    offer, requirement, pricing_source, plausibility_screener=plausibility_screener
+                )
             state.verification_results.append(result)
             if result.plausibility_screen:
                 state.log(
@@ -250,6 +259,7 @@ def run_negotiation(
     narrator: decision_agent.Narrator | None = None,
     plausibility_screener: PlausibilityScreener | None = None,
     compliance_client: HttpComplianceClient | None = None,
+    verification_client: HttpVerificationClient | None = None,
     negotiation_id: str | None = None,
 ) -> NegotiationState:
     """`negotiation_id`: pass an explicit ID when the caller must know it
@@ -295,5 +305,6 @@ def run_negotiation(
         narrator=narrator,
         plausibility_screener=plausibility_screener,
         compliance_client=compliance_client,
+        verification_client=verification_client,
     )
     return state

@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-68-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-69-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
@@ -191,7 +191,7 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 | Intake guardrails | `protectai/deberta-v3-base-prompt-injection-v2` + Microsoft Presidio, both self-hosted | Prompt-injection and PII detection on both FR-1 modalities (text/voice directly; photo via a real transcription call) — no external API, no cost |
 | API Gateway | Real JWT auth (`pyjwt`) + rate limiting (`slowapi`), as `pact-core` middleware | Auth off by default, rate limiting always on — see [Security](#security) |
 | Observability | Real OpenTelemetry spans, exported to console + BigQuery | Token usage, latency, prompt hashes, and `negotiation_id` correlation on every model call |
-| Distributed execution (opt-in) | Real Google Cloud Pub/Sub + Firestore + a standalone Compliance Agent service | Negotiation execution runs in an independently deployable worker; off by default (`PACT_DISTRIBUTED`) — see [Current status](#current-status--honest-scope) |
+| Distributed execution (opt-in) | Real Google Cloud Pub/Sub + Firestore + standalone Compliance and Verification Agent services | Negotiation execution runs in an independently deployable worker; off by default (`PACT_DISTRIBUTED`) — see [Current status](#current-status--honest-scope) |
 | Field-level encryption (opt-in) | Real AES-256-GCM (`cryptography`), on top of BigQuery's own encryption at rest | Budget ceiling, final price, reasoning — off by default (`PACT_FIELD_ENCRYPTION_KEY`) — see [Current status](#current-status--honest-scope) |
 | Persistence & analytics | Google BigQuery | Negotiation logs, evaluation-harness statistics, and model traces |
 | Deployment | Docker (single container) + ngrok | Cardless public URL — see [Deployment](#deployment) |
@@ -427,10 +427,10 @@ pytest tests/
 
 | Layer | Count | What it proves |
 |---|---|---|
-| Unit | 22 | Deterministic concession-curve math, compliance rule matching, real AES-256-GCM field encryption round-trips — no external calls |
+| Unit | 23 | Deterministic concession-curve math, compliance rule matching, real AES-256-GCM field encryption round-trips (including negotiation event detail text) — no external calls |
 | Integration | 34 | Real AWS/Azure pricing APIs, a real MCP protocol round-trip over stdio (subprocess), real Gemini narration and Vision calls, genuinely separate vendor services negotiating over real HTTP, the full API lifecycle, self-hosted prompt-injection/PII guardrail detection on both intake modalities, a real Vertex AI fallback, real JWT auth + rate limiting, real OpenTelemetry tracing, the real Pub/Sub-decoupled negotiation path (skip-gated, needs the real emulators), the real observability dashboard endpoint against live BigQuery data |
 | E2E | 12 | The full flagship scenario end to end — both via the direct pipeline and via the real ADK agent tree — plus the full scenario catalogue |
-| **Total** | **68** | |
+| **Total** | **69** | |
 
 None of the integration or e2e tests mock the external APIs — they hit
 real AWS, real Azure, and (when a key is configured) the real Gemini API,
@@ -474,8 +474,8 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | Vertex AI fallback for every Gemini call site | ✅ Implemented and tested — real fallback, not the default path |
 | Real API Gateway (JWT auth + rate limiting, as `pact-core` middleware) | ✅ Implemented and tested — auth off by default, rate limiting always on |
 | Real OpenTelemetry tracing (console + BigQuery `model_traces`) | ✅ Implemented and tested |
-| Distributed negotiation execution (real Pub/Sub worker + standalone Compliance service + Firestore) | ✅ Implemented and tested — real, off by default (`PACT_DISTRIBUTED`) |
-| Application-level AES-256-GCM field encryption (budget, final price, reasoning) | ✅ Implemented and tested — real, off by default (`PACT_FIELD_ENCRYPTION_KEY`) |
+| Distributed negotiation execution (real Pub/Sub worker + standalone Compliance and Verification services + Firestore) | ✅ Implemented and tested — real, off by default (`PACT_DISTRIBUTED`) |
+| Application-level AES-256-GCM field encryption (budget, final price, reasoning, event detail) | ✅ Implemented and tested — real, off by default (`PACT_FIELD_ENCRYPTION_KEY`) |
 | Gemini narration of individual negotiation moves, not just the final decision | 🔭 Designed, not yet connected |
 | GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
 | Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
@@ -496,10 +496,10 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
   URL changes on tunnel restart.
 - No formal security certification, penetration testing, or compliance
   audit has been performed or is claimed.
-- Distributed negotiation execution only splits out the Compliance Agent
-  as a standalone service today; Verification (the other feedback-loop
-  agent) remains an in-process call, and it's off by default — the live
-  demo runs the in-process orchestration graph, not the Pub/Sub path.
+- Distributed negotiation execution (both feedback-loop agents, Compliance
+  and Verification, split into standalone services) is real and tested,
+  but off by default — the live demo runs the in-process orchestration
+  graph, not the Pub/Sub path.
 
 Transparent limitations distinguish what is genuinely working today from
 what is designed but not yet built — the full breakdown below covers
@@ -657,14 +657,19 @@ data. What's real right now:
   never-raises discipline exactly. Proven in `tests/integration/test_tracing.py`
   and by the same live server run described above.
 - **Distributed negotiation execution — real Pub/Sub worker + standalone
-  Compliance Agent service + Firestore, off by default** —
-  `pact/worker/negotiation_worker.py` is an independently deployable
-  process that pulls from a real Google Cloud Pub/Sub subscription and
-  runs the same, unmodified `run_negotiation` pipeline per message; the
-  Compliance Agent is additionally split into its own standalone FastAPI
-  service (`pact/services/compliance_agent/app.py`, mirroring the
-  existing AWS/Azure vendor precedent), reached over real HTTP via
-  `HttpComplianceClient`. Firestore holds the shared negotiation state
+  Compliance and Verification Agent services + Firestore, off by
+  default** — `pact/worker/negotiation_worker.py` is an independently
+  deployable process that pulls from a real Google Cloud Pub/Sub
+  subscription and runs the same, unmodified `run_negotiation` pipeline
+  per message; both feedback-loop agents are additionally split into
+  their own standalone FastAPI services
+  (`pact/services/compliance_agent/app.py`,
+  `pact/services/verification_agent/app.py`, mirroring the existing
+  AWS/Azure vendor precedent), reached over real HTTP via
+  `HttpComplianceClient`/`HttpVerificationClient`. The Verification
+  service resolves its own pricing source and Gemma plausibility
+  screener locally (`pact/runtime_factories.py`) since neither can cross
+  a real process boundary. Firestore holds the shared negotiation state
   between the API process and the worker — the API pre-saves an
   `IN_PROGRESS` state, publishes the request, and does a bounded poll
   (~18s) so `POST /negotiations` still returns the complete final result
@@ -676,40 +681,44 @@ data. What's real right now:
   live demo runs the in-process orchestration graph. Proven for real by
   `tests/integration/test_distributed_negotiation.py`, which runs the
   flagship scenario through the real distributed path — a real Pub/Sub
-  emulator, a real worker subprocess, a real standalone Compliance
-  service subprocess, real Firestore — and asserts an identical offer
-  sequence and decision to the in-process baseline, and by a dedicated
-  `backend-distributed` CI job that runs this against the official Google
-  Cloud emulators on every push. Only Compliance is split out this way
-  today; Verification's `plausibility_screener` dependency is a Python
-  callable that can't cross a process boundary without its own service
-  resolving it locally, a real, disclosed, deferred piece of work.
+  emulator, a real worker subprocess, real standalone Compliance and
+  Verification service subprocesses, real Firestore — and asserts an
+  identical offer sequence and decision to the in-process baseline, and
+  by a dedicated `backend-distributed` CI job that runs this against the
+  official Google Cloud emulators on every push. A fresh `negotiation_id`
+  is minted per test run rather than a fixed string — a real bug caught
+  during this build, where a fixed ID's suspiciously-fast first pass
+  turned out to be reading a stale Firestore document from an earlier
+  test run instead of proving the current code path actually executed.
 - **Application-level field encryption — real AES-256-GCM, on top of
   BigQuery's own encryption at rest, off by default** —
   `pact/security/field_encryption.py` encrypts `budget_ceiling_usd`,
-  `final_price_usd`, and `reasoning` before every write to BigQuery's
-  `negotiations` table, using `cryptography`'s AES-256-GCM AEAD
+  `final_price_usd`, `reasoning`, and `negotiation_events.detail` before
+  every write to BigQuery, using `cryptography`'s AES-256-GCM AEAD
   primitive directly (not Fernet, which is AES-128) — real authenticated
   encryption, so a tampered ciphertext fails to decrypt rather than
   silently returning corrupted data. The budget ceiling is this system's
   closest analog to a reservation price/BATNA: the buyer's true
-  walk-away point, never revealed to a vendor during negotiation.
-  `infra/bigquery/schema.sql`'s two affected columns were changed from
-  `FLOAT64` to `STRING` to hold ciphertext, and the live `pact-hackathon`
-  table was genuinely recreated with the new schema. Verified end to
-  end, not just unit-tested: a real flagship-scenario negotiation was
-  run, written to the live table, queried back over `bq query`, and
-  decrypted to the exact original values ($115,000.0 budget,
-  $39,246.20 final price) — see `tests/unit/test_field_encryption.py`
-  and `test_bigquery_sink_encryption.py`. Configured via
+  walk-away point, never revealed to a vendor during negotiation; `detail`
+  is real free-text audit content that can embed dollar figures (e.g.
+  "$118,886.40 exceeds the budget ceiling of $115,000.00"), not a field
+  that's obviously safe to leave in plaintext just because it's a log.
+  `infra/bigquery/schema.sql`'s `budget_ceiling_usd`/`final_price_usd`
+  columns were changed from `FLOAT64` to `STRING` to hold ciphertext, and
+  the live `pact-hackathon` table was genuinely recreated with the new
+  schema. Verified end to end, not just unit-tested: a real
+  flagship-scenario negotiation was run, written to the live table,
+  queried back over `bq query`, and decrypted to the exact original
+  values ($115,000.0 budget, $39,246.20 final price) — see
+  `tests/unit/test_field_encryption.py` and
+  `test_bigquery_sink_encryption.py`. Configured via
   `PACT_FIELD_ENCRYPTION_KEY` (base64-encoded 32-byte key); when unset,
   falls back to plaintext with a loud warning log at write time,
   disclosed rather than silent — the same posture as `AUTH_REQUIRED` and
-  `PACT_DISTRIBUTED`. `savings_pct` and `negotiation_events.detail`
-  remain unencrypted by disclosed choice: the former is what the
-  evaluation harness's real aggregate SQL (§29) actually reads (a ratio,
-  materially less sensitive alone than the raw dollar figures behind
-  it), and the latter is deferred scope, not an oversight.
+  `PACT_DISTRIBUTED`. `event_type`, `vendor_id`, `round_number`, and
+  `savings_pct` remain unencrypted by disclosed choice: the evaluation
+  harness's real aggregate SQL (§29) reads them directly, and none of
+  them is free text that could itself leak a sensitive figure.
 - **Real, in-app observability dashboard** — `GET /observability/summary`
   (`pact/api/routes_observability.py`) runs real SQL against BigQuery:
   per-model call count/latency/tokens/error rate from `model_traces`,
@@ -749,11 +758,11 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
       Grafana) or alerting on anomalous model behavior — the in-app
       `/observability` dashboard covers real-time visualization today
       (see [Current status](#current-status--honest-scope)), not alerting
-- [ ] Split the Verification Agent into its own standalone service too
-      (Compliance is already real and split — see
-      [Current status](#current-status--honest-scope)); deploy the
-      distributed worker/services as separately scaled live Cloud Run
-      deployments rather than bundled in the one demo container
+- [ ] Deploy the distributed worker/services (both Compliance and
+      Verification are already real and split — see
+      [Current status](#current-status--honest-scope)) as separately
+      scaled live Cloud Run deployments rather than bundled in the one
+      demo container
 
 ```mermaid
 flowchart LR

@@ -94,13 +94,21 @@ def write_negotiation(state: NegotiationState) -> None:
         }
         _load_rows(client, f"{PROJECT_ID}.{DATASET_ID}.negotiations", [negotiation_row])
 
+        # `detail` is real free-text audit content (can embed dollar
+        # figures and reasoning, e.g. "$118,886.40 exceeds the budget
+        # ceiling of $115,000.00") -- encrypted for the same reason
+        # budget_ceiling_usd/final_price_usd/reasoning are (PRD §26).
+        # `event_type`, `vendor_id`, `round_number` stay plaintext: the
+        # evaluation harness's aggregate SQL (§29) filters on event_type,
+        # and losing that would break real, working statistics for a
+        # field that's inherently not free text.
         event_rows = [
             {
                 "negotiation_id": state.negotiation_id,
                 "event_type": e.event_type.value,
                 "vendor_id": e.vendor_id.value if e.vendor_id else None,
                 "round_number": e.round_number,
-                "detail": e.detail,
+                "detail": _maybe_encrypted(e.detail),
                 "timestamp": e.timestamp.isoformat(),
             }
             for e in state.events
