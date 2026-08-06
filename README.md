@@ -35,7 +35,7 @@
 
 ---
 
-## Competition Mission
+## 🏆 Competition Mission
 
 **AI Agent Builder Series 2026 Grand Finale · B2B Services · #7 Vendor Evaluation**
 
@@ -47,14 +47,41 @@ Pact turns that question into a bounded, reproducible negotiation:
 
 ```mermaid
 flowchart LR
-    A["📝 Requirement"] --> B["Discover"]
-    B --> C["Negotiate"]
-    C --> D["Verify"]
-    D --> E["Enforce Policy"]
-    E --> F["Human Decision"]
+    A["📝 Requirement"] --> B["🔎 Discover"]
+    B --> C["🤝 Negotiate"]
+    C --> D["🔬 Verify"]
+    D --> E["🛡️ Enforce Policy"]
+    E --> F["👤 Human Decision"]
 ```
 
 This is not a vendor comparison table. It is a system that negotiates on your behalf, catches a vendor's claim that doesn't hold up against real data, rejects a deal that violates your own policy — even the cheapest one — and stops at the human-control boundary.
+
+### Today vs. Pact
+
+```mermaid
+flowchart TD
+    subgraph today["😩 Today"]
+        direction TB
+        T1["🙋 Buyer emails vendors"] --> T2["📨 Quotes trickle in"]
+        T2 --> T3["📊 Spreadsheet comparison"]
+        T3 --> T4["🤷 Decision on trust"]
+    end
+    subgraph pact["🤝 With Pact"]
+        direction TB
+        P1["🏢 Buyer Agent"] <-->|"real HTTP, simultaneous"| P2["🏢 Vendor Agents"]
+        P2 --> P3["🔬 Verification Agent"]
+        P3 --> P4["🛡️ Compliance Agent"]
+        P4 --> P5["📋 Decision + Evidence"]
+        P5 --> P6["👤 Human Approval"]
+    end
+```
+
+Cloud GPU procurement is Pact's first deployment of a broader idea: as
+organizations increasingly transact through software agents rather than
+people, something has to verify what those agents claim to each other
+and enforce policy on an organization's behalf before a commitment is
+made. That's the layer Pact demonstrates here — see
+[Roadmap](#roadmap) for where this goes beyond cloud compute.
 
 ---
 
@@ -71,7 +98,7 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 
 ---
 
-## Validation Evidence
+## 🔍 Validation Evidence
 
 | Technical question | Evidence-backed answer |
 |---|---|
@@ -87,7 +114,7 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 
 ---
 
-## Why Pact Stands Out
+## 💡 Why Pact Stands Out
 
 | Capability | What you get | Why it matters |
 |---|---|---|
@@ -100,9 +127,28 @@ It **never** means submitting a purchase order, charging a payment method, or ex
 | Self-measuring evaluation harness | Real aggregate statistics computed via SQL from real logged runs | No claimed savings number that isn't backed by a re-runnable run |
 | Photo/voice requirement intake | Structured fields extracted from a photographed quote or a spoken transcript | Missing fields come back `null`, never an invented value |
 
+### 🎯 Why Pact Doesn't Score Vendors
+
+Most vendor-evaluation tools produce something like this:
+
+| Vendor | Composite score |
+|---|---:|
+| Vendor A | 88 |
+| Vendor B | 82 |
+| Vendor C | 76 |
+
+Then the honest follow-up question — *why 88, not 85?* — has no real
+answer. The number is a weighted blend of sub-scores nobody outside the
+system can independently check, presented with false precision.
+
+Pact doesn't produce that number. It verifies claims against real
+external data, applies your policy as a hard pass/fail gate, negotiates
+where a claim doesn't hold up, and hands you a decision whose evidence
+you can check yourself — not a score you have to trust.
+
 ---
 
-## What Pact Does Not Claim
+## 🚫 What Pact Does Not Claim
 
 Every claim in this README is backed by something you can independently
 check — a real test file, a real CI run, a real live endpoint — not a
@@ -163,7 +209,7 @@ find:
 
 ---
 
-## Canonical Product Workflow
+## 🧭 Canonical Product Workflow
 
 The flagship scenario is 8× H100 GPUs, a 3-month contract, and a $115,000 budget. Pact:
 
@@ -205,7 +251,7 @@ The general rule these two rows illustrate — not just this one scenario:
 
 ```mermaid
 flowchart TD
-    A["Vendor offer"] --> B{"Verified against<br/>real external data?"}
+    A["💰 Vendor offer"] --> B{"Verified against<br/>real external data?"}
     B -- No --> C["❌ Rejected — renegotiate"]
     B -- Yes --> D{"Passes policy<br/>(budget, blocked vendor,<br/>certifications)?"}
     D -- No --> E["❌ Rejected — renegotiate"]
@@ -265,11 +311,11 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 
 ```mermaid
 flowchart LR
-    USER["User<br/>typed, photo, or voice input"] --> CORE["Pact Core<br/>6-agent pipeline<br/>orchestrated via Google ADK"]
-    CORE <-->|real HTTP negotiation| AWS["AWS Vendor Agent<br/>real AWS Price List API"]
-    CORE <-->|real HTTP negotiation| AZURE["Azure Vendor Agent<br/>real Azure Retail Prices API"]
-    CORE -.->|scaffolded, not yet live| OTHER["GCP / RunPod<br/>Vendor Agents"]
-    CORE --> DECISION["Decision + Evidence + Reasoning<br/>held for human approval"]
+    USER["🙋 User<br/>typed, photo, or voice input"] --> CORE["🧠 Pact Core<br/>6-agent pipeline<br/>orchestrated via Google ADK"]
+    CORE <-->|real HTTP negotiation| AWS["☁️ AWS Vendor Agent<br/>real AWS Price List API"]
+    CORE <-->|real HTTP negotiation| AZURE["☁️ Azure Vendor Agent<br/>real Azure Retail Prices API"]
+    CORE -.->|scaffolded, not yet live| OTHER["🔌 GCP / RunPod<br/>Vendor Agents"]
+    CORE --> DECISION["📋 Decision + Evidence + Reasoning<br/>held for human approval"]
 ```
 
 The six agents (Buyer, Discovery, Negotiation, Verification, Compliance,
@@ -281,13 +327,13 @@ genuinely wired to live pricing data today:
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant N as Negotiation Agent
-    participant AWS as AWS Vendor Agent
-    participant AZ as Azure Vendor Agent
-    participant V as Verification Agent
-    participant C as Compliance Agent
-    participant D as Decision Agent
+    participant U as 🙋 User
+    participant N as 🤝 Negotiation Agent
+    participant AWS as ☁️ AWS Vendor Agent
+    participant AZ as ☁️ Azure Vendor Agent
+    participant V as 🔬 Verification Agent
+    participant C as 🛡️ Compliance Agent
+    participant D as 📋 Decision Agent
 
     U->>N: 8x H100 GPUs, 3-month contract, $115,000 budget
 
@@ -317,7 +363,7 @@ sequenceDiagram
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 docs/                   PRD and architecture documentation
@@ -432,7 +478,7 @@ cd backend && source .venv/bin/activate
 python -m pact.mcp_tools.server   # speaks real MCP over stdio; connect any MCP client
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 | Variable | Where | Required | Description |
 |---|---|---|---|
@@ -481,7 +527,7 @@ Full policy: [SECURITY.md](SECURITY.md).
   testing, or compliance audit has been performed or is claimed
   (PRD §26).
 
-## Testing
+## ✅ Testing
 
 ```bash
 cd backend && source .venv/bin/activate
@@ -509,7 +555,7 @@ CI runs the emulator-gated test for real in a separate job
 (`backend-distributed`) rather than skipping it — see
 `.github/workflows/ci.yml`.
 
-## Evaluation harness
+## 📈 Evaluation harness
 
 ```bash
 cd backend && source .venv/bin/activate
@@ -883,7 +929,7 @@ first-time visitors a one-click interstitial page before reaching the
 app. Both are disclosed limitations of the no-payment path chosen here,
 not attempts to hide them.
 
-## Technical Q&A
+## ❓ Technical Q&A
 
 <details>
 <summary><strong>How is a vendor's claim actually verified?</strong></summary>
@@ -952,7 +998,7 @@ outcomes. Anyone can independently verify the real numbers by querying
 the same public APIs Pact uses.
 </details>
 
-## Documentation
+## 📚 Documentation
 
 | Guide | Purpose |
 |---|---|
@@ -960,11 +1006,11 @@ the same public APIs Pact uses.
 | [Architecture](docs/ARCHITECTURE.md) | The six-agent pipeline, negotiation sequence, data/infrastructure layer, and evaluation harness pipeline, each diagrammed |
 | [Engineering Log](docs/ENGINEERING_LOG.md) | Every real bug found and fixed during this build — not a highlight reel |
 
-## License
+## 📄 License
 
 MIT — see [LICENSE](LICENSE).
 
-## Acknowledgements
+## 🙏 Acknowledgements
 
 - AI Agent Builder Series 2026 — the program this was built for
 - [AWS Price List Bulk API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) and [Azure Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices) — the real, public, keyless pricing data this whole build is grounded in
