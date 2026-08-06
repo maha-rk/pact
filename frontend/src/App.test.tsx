@@ -5,6 +5,10 @@ import App from "./App";
 import { buildNegotiationState } from "./test/fixtures";
 import * as api from "./api";
 
+async function enterNegotiate(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Start a negotiation →" }));
+}
+
 describe("App", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -16,13 +20,45 @@ describe("App", () => {
     });
   });
 
-  it("renders the requirement form pre-filled with the flagship scenario defaults", () => {
+  it("shows the landing page first, not the negotiation form", () => {
     render(<App />);
 
+    expect(screen.getByText("Which vendor's claimed discount is real?")).toBeInTheDocument();
+    expect(screen.queryByText("Requirement")).not.toBeInTheDocument();
+  });
+
+  it("enters the negotiate view from the landing page's primary CTA", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await enterNegotiate(user);
+
+    expect(screen.getByText("Requirement")).toBeInTheDocument();
     expect(screen.getByDisplayValue("8")).toBeInTheDocument();
     expect(screen.getByDisplayValue("3")).toBeInTheDocument();
     expect(screen.getByDisplayValue("115000")).toBeInTheDocument();
     expect(screen.queryByText(/Decision \/ Evidence \/ Reasoning/)).not.toBeInTheDocument();
+  });
+
+  it("enters the observability view from the landing page's secondary CTA", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "See live results" }));
+
+    expect(await screen.findByText(/nothing real to/)).toBeInTheDocument();
+  });
+
+  it("returns to the landing page when the sidebar brand is clicked", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    await enterNegotiate(user);
+
+    const brandButton = container.querySelector(".sidebar-brand");
+    expect(brandButton).not.toBeNull();
+    await user.click(brandButton as HTMLElement);
+
+    expect(screen.getByText("Which vendor's claimed discount is real?")).toBeInTheDocument();
   });
 
   it("runs a negotiation and renders the resulting decision tab", async () => {
@@ -31,6 +67,7 @@ describe("App", () => {
     vi.spyOn(api, "createNegotiation").mockResolvedValue(state);
 
     render(<App />);
+    await enterNegotiate(user);
     await user.click(screen.getByRole("button", { name: "Start negotiation" }));
 
     expect(await screen.findByText("AZURE")).toBeInTheDocument();
@@ -42,6 +79,7 @@ describe("App", () => {
     vi.spyOn(api, "createNegotiation").mockResolvedValue(buildNegotiationState());
 
     render(<App />);
+    await enterNegotiate(user);
     await user.click(screen.getByRole("button", { name: "Start negotiation" }));
     await screen.findByText("AZURE");
 
@@ -57,6 +95,7 @@ describe("App", () => {
     vi.spyOn(api, "createNegotiation").mockRejectedValue(new Error("503 Service Unavailable"));
 
     render(<App />);
+    await enterNegotiate(user);
     await user.click(screen.getByRole("button", { name: "Start negotiation" }));
 
     expect(await screen.findByText(/Request failed: 503 Service Unavailable/)).toBeInTheDocument();
@@ -65,6 +104,7 @@ describe("App", () => {
   it("updates form fields as the user edits them", async () => {
     const user = userEvent.setup();
     render(<App />);
+    await enterNegotiate(user);
 
     const gpuInput = screen.getByLabelText("GPU count");
     await user.clear(gpuInput);
@@ -76,6 +116,7 @@ describe("App", () => {
   it("switches to the Observability view and back", async () => {
     const user = userEvent.setup();
     render(<App />);
+    await enterNegotiate(user);
 
     await user.click(screen.getByRole("button", { name: "Observability" }));
     expect(await screen.findByText(/nothing real to/)).toBeInTheDocument();
@@ -90,6 +131,7 @@ describe("App", () => {
     const createSpy = vi.spyOn(api, "createNegotiation").mockResolvedValue(buildNegotiationState());
 
     render(<App />);
+    await enterNegotiate(user);
     await user.click(screen.getByRole("button", { name: "Start negotiation" }));
 
     await waitFor(() =>

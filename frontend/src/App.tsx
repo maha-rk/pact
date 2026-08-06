@@ -6,6 +6,7 @@ import type { ParsedRequirement } from "./api";
 import { DecisionView } from "./components/DecisionView";
 import { ReplayTimeline } from "./components/ReplayTimeline";
 import { ObservabilityDashboard } from "./components/ObservabilityDashboard";
+import { LandingPage } from "./components/LandingPage";
 
 // Non-standard browser API (Chrome/Edge/Safari); no official TS lib types.
 type SpeechRecognitionLike = {
@@ -31,7 +32,7 @@ const FLAGSHIP_DEFAULTS = {
 };
 
 type Tab = "decision" | "replay";
-type View = "negotiate" | "observability";
+type View = "landing" | "negotiate" | "observability";
 
 function IconNegotiate() {
   return (
@@ -57,7 +58,7 @@ function IconChart() {
 }
 
 function App() {
-  const [view, setView] = useState<View>("negotiate");
+  const [view, setView] = useState<View>("landing");
   const [form, setForm] = useState(FLAGSHIP_DEFAULTS);
   const [state, setState] = useState<NegotiationState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -165,13 +166,22 @@ function App() {
     }
   };
 
+  if (view === "landing") {
+    return (
+      <LandingPage
+        onEnterNegotiate={() => setView("negotiate")}
+        onEnterObservability={() => setView("observability")}
+      />
+    );
+  }
+
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="sidebar-brand">
+        <button type="button" className="sidebar-brand" onClick={() => setView("landing")}>
           <span className="brand-mark">P</span>
           <span className="brand-name">Pact</span>
-        </div>
+        </button>
         <nav className="sidebar-nav">
           <button
             type="button"
