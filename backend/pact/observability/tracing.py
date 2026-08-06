@@ -40,6 +40,10 @@ TABLE = f"{PROJECT_ID}.{DATASET_ID}.model_traces"
 
 _configured = False
 
+_TEST_MODEL_SENTINEL = "fake-model"
+"""Model name used only by the tracing tests; never written to the real
+`model_traces` table (see `BigQuerySpanExporter.export`)."""
+
 
 class BigQuerySpanExporter(SpanExporter):
     """Mirrors `logging/bigquery_sink.py`'s batch-load-job, best-effort
@@ -50,7 +54,30 @@ class BigQuerySpanExporter(SpanExporter):
             from google.cloud import bigquery
 
             client = bigquery.Client(project=PROJECT_ID)
-            rows = [_span_to_row(s) for s in spans]
+            # `model_traces` is documented as one row per real Gemini/Gemma
+            # call -- but `trace.set_tracer_provider()` is process-global,
+            # so ADK's and the MCP SDK's own auto-instrumentation spans
+            # (invoke_agent, MCP send tools/call, ...) ride the same
+            # provider and would otherwise land here with no `model`
+            # attribute, showing up as a bogus "unknown model" row on the
+            # dashboard. Only spans opened via `traced_model_call` set
+            # "model", so that's the real filter for what belongs here.
+            # `fake-model` is the sentinel `tests/integration/test_tracing.py`
+            # uses to exercise the span mechanics without a live model call.
+            # Those spans normally go to the test's own InMemorySpanExporter,
+            # but `trace.set_tracer_provider()` only succeeds once per
+            # process -- so if anything imports `pact.main` (and runs
+            # `configure_tracing()`) before that test module loads, the real
+            # provider wins and test spans leak into the live table. Caught
+            # for real: two `fake-model` rows reached production BigQuery
+            # and surfaced on the dashboard.
+            rows = [
+                _span_to_row(s)
+                for s in spans
+                if (s.attributes or {}).get("model") not in (None, _TEST_MODEL_SENTINEL)
+            ]
+            if not rows:
+                return SpanExportResult.SUCCESS
             job_config = bigquery.LoadJobConfig(
                 source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
                 write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
@@ -93,13 +120,25 @@ def _ns_to_iso(ns: int) -> str:
     return datetime.datetime.fromtimestamp(ns / 1_000_000_000, tz=datetime.UTC).isoformat()
 
 
+def _running_under_pytest() -> bool:
+    # Reliable regardless of test collection/import order or which test
+    # happens to trigger the first real model call in a session -- pytest
+    # sets this for the duration of every test's execution, unlike the
+    # module-import-time "set the in-memory provider first" trick, which
+    # only wins if this module hasn't already been configured for real by
+    # an earlier test in the same process (see test_observability.py's
+    # comment on exactly that race).
+    return "PYTEST_CURRENT_TEST" in os.environ
+
+
 def configure_tracing() -> None:
     global _configured
     if _configured:
         return
     provider = TracerProvider(resource=Resource.create({"service.name": "pact-core"}))
     provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-    provider.add_span_processor(BatchSpanProcessor(BigQuerySpanExporter()))
+    if not _running_under_pytest():
+        provider.add_span_processor(BatchSpanProcessor(BigQuerySpanExporter()))
     trace.set_tracer_provider(provider)
     _configured = True
 
