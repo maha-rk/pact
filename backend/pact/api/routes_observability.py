@@ -60,14 +60,18 @@ class ObservabilitySummary(BaseModel):
     negotiations: NegotiationAggregateSummary | None = None
 
 
-_MODEL_TRACE_SUMMARY_SQL = f"""
+# {project}/{dataset} are filled in below from PROJECT_ID/DATASET_ID --
+# operator-set config (an env var with a hardcoded fallback, and a
+# hardcoded literal), never end-user input, so this isn't a real
+# injection vector despite the string-built query bandit (B608) flags.
+_MODEL_TRACE_SUMMARY_SQL = """
 SELECT
   model,
   COUNT(*) AS call_count,
   ROUND(AVG(latency_ms), 1) AS avg_latency_ms,
   SUM(tokens_total) AS total_tokens,
   ROUND(SAFE_DIVIDE(COUNTIF(error), COUNT(*)), 4) AS error_rate
-FROM `{PROJECT_ID}.{DATASET_ID}.model_traces`
+FROM `{project}.{dataset}.model_traces`
 -- Belt-and-suspenders alongside the exporter-side filter in
 -- observability/tracing.py: this table is documented as one row per real
 -- Gemini/Gemma call, never a raw ADK/MCP auto-instrumentation span (no
@@ -77,7 +81,7 @@ FROM `{PROJECT_ID}.{DATASET_ID}.model_traces`
 WHERE model IS NOT NULL AND model != 'fake-model'
 GROUP BY model
 ORDER BY call_count DESC
-"""
+""".format(project=PROJECT_ID, dataset=DATASET_ID)  # nosec B608
 
 # Mirrors infra/bigquery/queries_aggregate.sql exactly (PRD §29) --
 # embedded here rather than read from that file at request time, since a
@@ -89,10 +93,11 @@ ORDER BY call_count DESC
 # unrelated event population than `runs` and can exceed 100% (caught for
 # real during this build: 116 distinct event negotiation_ids vs. 5 real
 # `negotiations` rows produced an impossible 1966% figure before the fix).
-_NEGOTIATION_AGGREGATE_SQL = f"""
+# Same {project}/{dataset} operator-config rationale as the query above.
+_NEGOTIATION_AGGREGATE_SQL = """
 WITH runs AS (
   SELECT negotiation_id, status, final_price_usd, savings_pct, approved
-  FROM `{PROJECT_ID}.{DATASET_ID}.negotiations`
+  FROM `{project}.{dataset}.negotiations`
   -- Evaluation-harness runs only (PRD §29). Ad-hoc demo/API runs are
   -- overwhelmingly the flagship happy path, so pooling them drives the
   -- agreement rate upward toward 100% with every demo click -- measuring
@@ -104,18 +109,18 @@ WITH runs AS (
 ),
 per_negotiation_rounds AS (
   SELECT negotiation_id, MAX(round_number) AS rounds_to_agreement
-  FROM `{PROJECT_ID}.{DATASET_ID}.negotiation_events`
+  FROM `{project}.{dataset}.negotiation_events`
   WHERE event_type = 'offer_made' AND negotiation_id IN (SELECT negotiation_id FROM runs)
   GROUP BY negotiation_id
 ),
 claim_catches AS (
   SELECT DISTINCT negotiation_id
-  FROM `{PROJECT_ID}.{DATASET_ID}.negotiation_events`
+  FROM `{project}.{dataset}.negotiation_events`
   WHERE event_type = 'claim_rejected' AND negotiation_id IN (SELECT negotiation_id FROM runs)
 ),
 compliance_catches AS (
   SELECT DISTINCT negotiation_id
-  FROM `{PROJECT_ID}.{DATASET_ID}.negotiation_events`
+  FROM `{project}.{dataset}.negotiation_events`
   WHERE event_type = 'compliance_rejected' AND negotiation_id IN (SELECT negotiation_id FROM runs)
 )
 SELECT
@@ -127,7 +132,7 @@ SELECT
   ROUND(SAFE_DIVIDE((SELECT COUNT(*) FROM compliance_catches), COUNT(*)), 4) AS compliance_rejection_rate
 FROM runs r
 LEFT JOIN per_negotiation_rounds pr USING (negotiation_id)
-"""
+""".format(project=PROJECT_ID, dataset=DATASET_ID)  # nosec B608
 
 
 @router.get("/summary", response_model=ObservabilitySummary)

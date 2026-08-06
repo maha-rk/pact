@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import jwt as pyjwt
 import pytest
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException
 from fastapi.testclient import TestClient
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from pact.api.gateway import create_access_token, limiter, require_bearer_token
+from pact.api.gateway import limiter
 
 
 def test_issued_token_is_a_real_verifiable_jwt(monkeypatch):
@@ -50,9 +51,9 @@ def test_auth_dependency_rejects_missing_and_bad_tokens_when_required(monkeypatc
 
     importlib.reload(gateway)
 
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException):
         asyncio.run(gateway.require_bearer_token(authorization=None))
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException):
         asyncio.run(gateway.require_bearer_token(authorization="Bearer not-a-real-token"))
 
     good_token = gateway.create_access_token(subject="pact-operator")

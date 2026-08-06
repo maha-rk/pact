@@ -530,6 +530,9 @@ bq query --project_id=pact-hackathon --use_legacy_sql=false < ../infra/bigquery/
 | GCP and RunPod vendor integrations | 🔭 Scaffolded, not yet wired to real pricing |
 | Managed cloud hosting (Cloud Run / Hugging Face Spaces) | 🔭 Evaluated and ruled out — both require billing |
 | Real observability dashboard (`GET /observability/summary`, frontend "Observability" view) | ✅ Implemented and tested — real SQL against `model_traces` + `negotiations` |
+| Verifiable SHA-256 evidence hash per negotiation (`GET /negotiations/{id}/evidence`) | ✅ Implemented and tested — independently recomputable, no `negotiation_id` in the bundle by design |
+| Frontend component test suite (Vitest + Testing Library) | ✅ Implemented and tested — 26 tests across App, DecisionView, ReplayTimeline, ObservabilityDashboard |
+| CI lint + security gate (ruff, bandit) on every push | ✅ Implemented — real findings fixed during this build (narrowed exception assertions, dead imports, `.format()`-based SQL to keep bandit's static string-check honest), not just badges |
 
 ## Honest Limitations
 

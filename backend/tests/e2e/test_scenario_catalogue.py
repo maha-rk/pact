@@ -7,8 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
 
-from run_catalogue import CATALOGUE_PATH, run_scenario  # noqa: E402
 import yaml
+from run_catalogue import CATALOGUE_PATH, run_scenario  # noqa: E402
 
 
 def _load_scenarios():

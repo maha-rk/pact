@@ -35,11 +35,43 @@ dev = [
     "pytest-asyncio>=0.24",
     "respx>=0.21",
     "pillow>=10.0",
+    "ruff>=0.16",
+    "bandit>=1.9",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+# E4/E7/E9 + F: real pyflakes/pycodestyle errors (unused/undefined names,
+# syntax issues). I: import sorting. B: flake8-bugbear real bug patterns.
+# Deliberately not selecting BLE001/S110 (blind except / try-except-pass):
+# several modules in this codebase catch broadly on purpose and fall back
+# to a documented degraded mode rather than block a negotiation on a
+# narration/guardrail/tracing failure -- see docs/ENGINEERING_LOG.md.
+select = ["E4", "E7", "E9", "F", "I", "B"]
+# B008: FastAPI's own documented pattern for file/query/body params
+# (`image: UploadFile = File(...)`) is a function call in a default arg;
+# bugbear can't distinguish this from a real mutable-default bug.
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# load_dotenv() must run before the rest of pact.main's imports so that
+# GEMINI_API_KEY etc. are already set when those modules read the
+# environment at import time.
+"pact/main.py" = ["E402"]
+
+[tool.bandit]
+# Same rationale as the ruff BLE001/S110 exclusion above: this codebase's
+# guardrail/narration/tracing fallbacks intentionally catch broadly and
+# degrade gracefully rather than block a negotiation. B110 (try-except-pass)
+# and B112 (try-except-continue) fire on exactly those disclosed patterns.
+skips = ["B110", "B112"]
+exclude_dirs = ["tests", ".venv"]
 
 [tool.setuptools.packages.find]
 include = ["pact*"]

@@ -13,7 +13,12 @@ import time
 from pact.models.schemas import AgentCard, VendorId
 from pact.orchestration.graph import run_negotiation
 from pact.security.evidence_hash import compute_evidence_hash, evidence_bundle
-from tests.fixtures import FLAGSHIP_CLAIMED_DISCOUNTS, FixturePricingSource, flagship_policy, flagship_requirement
+from tests.fixtures import (
+    FLAGSHIP_CLAIMED_DISCOUNTS,
+    FixturePricingSource,
+    flagship_policy,
+    flagship_requirement,
+)
 
 CANDIDATE_VENDORS = [VendorId.AWS, VendorId.AZURE, VendorId.GCP]
 AGENT_CARDS = {

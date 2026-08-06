@@ -12,11 +12,22 @@ import uuid
 from pact.a2a.compliance_client import HttpComplianceClient
 from pact.a2a.vendor_client import HttpVendorClient, VendorUnavailableError
 from pact.a2a.verification_client import HttpVerificationClient
-from pact.agents import compliance_agent, decision_agent, discovery_agent, verification_agent
+from pact.agents import (
+    compliance_agent,
+    decision_agent,
+    discovery_agent,
+    verification_agent,
+)
 from pact.agents.negotiation_agent import buyer_offer_at_round, vendor_offer_at_round
 from pact.mcp_tools.pricing_tool import PricingSource
 from pact.mcp_tools.verification_tool import PlausibilityScreener
-from pact.models.schemas import AgentCard, Offer, PolicyConstraints, Requirement, VendorId
+from pact.models.schemas import (
+    AgentCard,
+    Offer,
+    PolicyConstraints,
+    Requirement,
+    VendorId,
+)
 from pact.orchestration.state import EventType, NegotiationState, NegotiationStatus
 from pact.security.evidence_hash import compute_evidence_hash
 

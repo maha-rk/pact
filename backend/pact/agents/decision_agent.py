@@ -6,7 +6,13 @@ from __future__ import annotations
 
 from typing import Callable
 
-from pact.models.schemas import ComplianceResult, Decision, EvidenceItem, Offer, VerificationResult
+from pact.models.schemas import (
+    ComplianceResult,
+    Decision,
+    EvidenceItem,
+    Offer,
+    VerificationResult,
+)
 
 Narrator = Callable[..., str]
 

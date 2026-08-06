@@ -24,7 +24,7 @@ def test_offer_never_crosses_reservation_past_final_round():
 def test_offers_monotonically_concede_toward_reservation():
     params = ConcessionParams(opening=12000, reservation=9000, total_rounds=6)
     sequence = generate_offer_sequence(params)
-    for a, b in zip(sequence, sequence[1:]):
+    for a, b in zip(sequence, sequence[1:], strict=False):
         assert b <= a
 
 

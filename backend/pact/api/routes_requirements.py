@@ -38,7 +38,10 @@ async def parse_requirement_image(request: Request, image: UploadFile = File(...
         raise HTTPException(status_code=413, detail="Image too large (max 10MB)")
 
     from pact.models.guardrail_client import screen_text_input
-    from pact.models.requirement_parser import parse_requirement_from_image, transcribe_image_text
+    from pact.models.requirement_parser import (
+        parse_requirement_from_image,
+        transcribe_image_text,
+    )
 
     # Real verbatim transcription so photo intake gets the same guardrail
     # screen as text/voice intake (PRD §23a) -- best-effort: a failure here

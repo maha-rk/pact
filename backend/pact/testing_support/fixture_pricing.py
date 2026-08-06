@@ -27,7 +27,6 @@ so existing test imports are unaffected."""
 
 from __future__ import annotations
 
-from pact.mcp_tools.pricing_tool import PricingSource
 from pact.models.schemas import Requirement, VendorId
 
 HOURS_PER_MONTH = 30 * 24

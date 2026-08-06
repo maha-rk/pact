@@ -10,8 +10,6 @@ from __future__ import annotations
 import base64
 import os
 
-import pytest
-
 from pact.logging import bigquery_sink
 from pact.security import field_encryption
 

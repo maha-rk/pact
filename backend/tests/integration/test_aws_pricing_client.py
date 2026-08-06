@@ -4,8 +4,8 @@ live AWS Price List Bulk API by refresh_pricing_cache.py -- PRD §30's
 
 import pytest
 
-from pact.models.schemas import VendorId, Requirement
-from vendors.aws_vendor.pricing_client import AWSPricingClient, CACHE_PATH
+from pact.models.schemas import Requirement, VendorId
+from vendors.aws_vendor.pricing_client import CACHE_PATH, AWSPricingClient
 
 pytestmark = pytest.mark.skipif(
     not CACHE_PATH.exists(), reason="pricing cache not populated; run refresh_pricing_cache.py first"

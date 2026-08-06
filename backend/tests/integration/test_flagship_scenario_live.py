@@ -19,7 +19,7 @@ from pact.a2a.vendor_client import HttpVendorClient
 from pact.models.schemas import AgentCard, PolicyConstraints, Requirement, VendorId
 from pact.orchestration import approval
 from pact.orchestration.graph import run_negotiation
-from pact.orchestration.state import EventType, NegotiationStatus
+from pact.orchestration.state import NegotiationStatus
 from vendors.aws_vendor.pricing_client import AWSPricingClient
 from vendors.azure_vendor.pricing_client import AzurePricingClient
 

@@ -14,7 +14,11 @@ import pytest
 from PIL import Image, ImageDraw
 
 from pact.models.guardrail_client import screen_text_input
-from pact.models.requirement_parser import parse_requirement_from_image, parse_requirement_from_text, transcribe_image_text
+from pact.models.requirement_parser import (
+    parse_requirement_from_image,
+    parse_requirement_from_text,
+    transcribe_image_text,
+)
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("GEMINI_API_KEY"),

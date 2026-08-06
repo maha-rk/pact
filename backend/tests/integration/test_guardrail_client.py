@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from pact.models.guardrail_client import injection_classifier_load_error, screen_text_input
+from pact.models.guardrail_client import (
+    injection_classifier_load_error,
+    screen_text_input,
+)
 
 
 def test_catches_the_injection_attempt_enkrypt_missed():
