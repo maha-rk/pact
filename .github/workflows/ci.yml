@@ -52,12 +52,16 @@ jobs:
       - name: Start Pub/Sub + Firestore emulators
         run: |
           # ubuntu-latest's preinstalled gcloud has its component manager
-          # disabled (apt-managed, not self-update) -- install the
-          # emulators via apt, as gcloud's own error message directs.
-          # `apt-get update` first: the runner's package index for the
-          # already-registered Google Cloud SDK apt repo is stale/empty
-          # by default, so these split component packages aren't visible
-          # without a refresh.
+          # disabled (apt-managed, not self-update); its own error message
+          # points at apt package names, but the Google Cloud SDK apt repo
+          # itself isn't actually registered on this image (gcloud is
+          # preinstalled a different way) -- register it explicitly per
+          # Google's documented setup before installing the emulators.
+          sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
+          curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+            | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+            | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
           sudo apt-get update
           sudo apt-get install -y google-cloud-cli-pubsub-emulator google-cloud-cli-firestore-emulator
           gcloud beta emulators pubsub start --host-port=localhost:8085 &
