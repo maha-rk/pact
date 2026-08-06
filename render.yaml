@@ -1,0 +1,32 @@
+# Render Blueprint (Infrastructure as Code) -- deploys the exact same
+# image as the ngrok/local path (infra/huggingface/Dockerfile), on
+# Render's free Web Service tier. No card required to deploy this --
+# see README's Deployment section for why this exists alongside ngrok
+# (redundancy: Render doesn't depend on the operator's own machine
+# staying on, but its free tier spins down after 15 minutes idle and
+# takes ~1 minute to wake on the next request; ngrok has the opposite
+# trade-off -- always warm, but tied to a laptop staying online).
+#
+# Deploy: connect this repo in the Render dashboard (New -> Blueprint),
+# or use the "Deploy to Render" button in the README. Render prompts
+# for GEMINI_API_KEY on first deploy since it's marked `sync: false`
+# below -- never committed here.
+#
+# Deliberately not wired here: the read-only BigQuery credential the
+# ngrok path mounts for a live Observability dashboard. Render's free
+# instances don't support arbitrary volume mounts, and base64-encoding
+# a service-account key into an env var is real extra surface area for
+# a demo-URL-quality improvement -- not done without asking first. The
+# Observability view degrades to its honest "not reachable" state on
+# this deployment specifically; the ngrok deployment keeps it live.
+services:
+  - type: web
+    name: pact
+    runtime: docker
+    dockerfilePath: ./infra/huggingface/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /openapi.json
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false

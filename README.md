@@ -35,11 +35,25 @@
 
 ## Live Demo & Submission Links
 
+Two independent deployments of the exact same image
+(`infra/huggingface/Dockerfile`), on purpose: neither depends on the
+other staying up.
+
 | What | Link |
 |---|---|
 | GitHub repository | [github.com/maha-rk/pact](https://github.com/maha-rk/pact) |
-| Live demo | [epidemic-either-promoter.ngrok-free.dev](https://epidemic-either-promoter.ngrok-free.dev) — free-tier ngrok tunnel; the subdomain rotates on restart, **reconfirm this URL immediately before final submission** |
+| Live demo (primary) | _— add after deploying via the button below —_ · Render free tier, no card required; spins down after 15 min idle, ~1 min cold start on the next request |
+| Live demo (fallback) | [epidemic-either-promoter.ngrok-free.dev](https://epidemic-either-promoter.ngrok-free.dev) — always warm, but tied to the operator's machine staying on; free-tier ngrok subdomain rotates on restart, **reconfirm this URL immediately before final submission** |
 | Demo video | _— add before final submission —_ |
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/maha-rk/pact)
+
+The Observability dashboard shows real BigQuery data on the ngrok
+deployment (a read-only credential is mounted at deploy time — see
+[Deployment](#deployment)); on Render it shows its honest "not
+reachable" state instead, since Render's free tier doesn't support the
+same credential-mounting approach — degraded gracefully, not faked,
+consistent with every other missing-credential path in this build.
 
 ---
 
@@ -312,7 +326,7 @@ This walkthrough drives the actual running UI — nothing here is staged or pre-
 | Distributed execution (opt-in) | Real Google Cloud Pub/Sub + Firestore + standalone Compliance and Verification Agent services | Negotiation execution runs in an independently deployable worker; off by default (`PACT_DISTRIBUTED`) — see [Current status](#current-status--honest-scope) |
 | Field-level encryption (opt-in) | Real AES-256-GCM (`cryptography`), on top of BigQuery's own encryption at rest | Budget ceiling, final price, reasoning — off by default (`PACT_FIELD_ENCRYPTION_KEY`) — see [Current status](#current-status--honest-scope) |
 | Persistence & analytics | Google BigQuery | Negotiation logs, evaluation-harness statistics, and model traces |
-| Deployment | Docker (single container) + ngrok | Cardless public URL — see [Deployment](#deployment) |
+| Deployment | Docker (single container), deployed twice — ngrok tunnel + Render free tier | Two independent, cardless public URLs — see [Deployment](#deployment) |
 
 ---
 
@@ -962,6 +976,25 @@ issues a new random subdomain each time the tunnel restarts, and shows
 first-time visitors a one-click interstitial page before reaching the
 app. Both are disclosed limitations of the no-payment path chosen here,
 not attempts to hide them.
+
+### A second, independent deployment: Render
+
+`render.yaml` at the repo root is a real Blueprint (verified against
+Render's own published JSON Schema) that deploys the identical image
+above as a free Render Web Service — no card required, confirmed
+directly from Render's own docs ("This tutorial uses free Render
+resources. No payment is required"). It exists specifically so the live
+demo doesn't depend on a single point of failure: Render's free tier
+doesn't need the operator's laptop to stay on, at the cost of spinning
+down after 15 minutes idle and taking about a minute to wake back up on
+the next request — the opposite trade-off from ngrok's always-warm,
+laptop-dependent tunnel. See [Live Demo & Submission
+Links](#live-demo--submission-links) for both current URLs. The
+Observability dashboard's live BigQuery data is wired on the ngrok
+deployment only — Render's free instances don't support the same
+volume-mounted credential approach, so that one view degrades to its
+honest unavailable state there, same as running with no credential
+configured at all.
 
 ## Technical Q&A
 
