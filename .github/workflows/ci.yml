@@ -37,9 +37,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
+        id: setup-java
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - uses: actions/setup-python@v5
         with:
@@ -64,6 +65,13 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
           sudo apt-get update
           sudo apt-get install -y google-cloud-cli-pubsub-emulator google-cloud-cli-firestore-emulator
+          # google-cloud-cli-firestore-emulator pulls in openjdk-8 as an apt
+          # dependency, which can shadow `java` on PATH -- the Firestore
+          # emulator needs a real 21+ JRE, so force PATH back to the one
+          # actions/setup-java just configured before starting it.
+          export JAVA_HOME="${{ steps.setup-java.outputs.path }}"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
           gcloud beta emulators pubsub start --host-port=localhost:8085 > /tmp/pubsub-emulator.log 2>&1 &
           gcloud emulators firestore start --host-port=localhost:8080 > /tmp/firestore-emulator.log 2>&1 &
           # Cold JVM startup on a fresh runner (right after a ~2-minute
