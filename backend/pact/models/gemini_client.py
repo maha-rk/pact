@@ -10,7 +10,9 @@ import os
 import time
 
 _MODEL = "gemini-flash-latest"
-_MAX_ATTEMPTS = 2
+_MAX_ATTEMPTS = 1  # was 2: a second same-path attempt rarely helps a 429
+# (the quota doesn't recover in 1s) and doubles worst-case latency before
+# the Vertex fallback engages; one bounded attempt, then fail over.
 _RETRY_DELAY_SECONDS = 1.0
 _TIMEOUT_MS = 10000  # per-attempt hard cap (Google's enforced minimum) --
 # narration must never hang the whole negotiation indefinitely (NFR
