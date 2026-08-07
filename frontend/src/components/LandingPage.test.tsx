@@ -19,7 +19,7 @@ describe("LandingPage", () => {
     render(<LandingPage onEnterNegotiate={vi.fn()} onEnterObservability={vi.fn()} />);
 
     expect(screen.getByText("Autonomous procurement for the agent economy.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "The 6-Step Process: From requirement to decision, in seconds" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "The 6-Step Process: From Requirement to Decision, in Seconds" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Buyer" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Discovery" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Negotiation" })).toBeInTheDocument();
@@ -34,7 +34,7 @@ describe("LandingPage", () => {
     render(<LandingPage onEnterNegotiate={vi.fn()} onEnterObservability={vi.fn()} />);
 
     expect(screen.getByText("From Spreadsheets to Agents")).toBeInTheDocument();
-    expect(screen.getByText("The flagship scenario")).toBeInTheDocument();
+    expect(screen.getByText("The Flagship Scenario")).toBeInTheDocument();
     expect(screen.getByText("$39,246.20")).toBeInTheDocument();
     expect(screen.getByText("No such discount tier exists under 12 months", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Pact doesn't score vendors")).toBeInTheDocument();
