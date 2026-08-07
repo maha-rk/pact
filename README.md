@@ -43,10 +43,8 @@ other staying up.
 |---|---|
 | GitHub repository | [github.com/maha-rk/pact](https://github.com/maha-rk/pact) |
 | Live demo (primary) | [pact-q2ej.onrender.com](https://pact-q2ej.onrender.com) — Render free tier, no card required; spins down after 15 min idle, ~1 min cold start on the next request |
-| Live demo (fallback) | [epidemic-either-promoter.ngrok-free.dev](https://epidemic-either-promoter.ngrok-free.dev) — always warm, but tied to the operator's machine staying on; free-tier ngrok subdomain rotates on restart, **reconfirm this URL immediately before final submission** |
+| Live demo (fallback) | [epidemic-either-promoter.ngrok-free.dev](https://epidemic-either-promoter.ngrok-free.dev) — always warm, but tied to the operator's machine staying on; free-tier ngrok subdomain rotates on restart|
 | Demo video | [Watch on YouTube](https://youtu.be/ijGDs1H-jbE) |
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/maha-rk/pact)
 
 The Observability dashboard shows real BigQuery data on the ngrok
 deployment (a read-only credential is mounted at deploy time — see
