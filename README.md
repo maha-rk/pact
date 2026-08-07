@@ -17,7 +17,7 @@
   <img alt="Tests" src="https://img.shields.io/badge/tests-79%20(73%20passed%2C%206%20skipped)-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
-  <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-NOT%20EXECUTED-E11D48" />
+  <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-Disabled%20by%20Design-0284C7" />
 </p>
 
 <p align="center">
@@ -44,7 +44,7 @@ other staying up.
 | GitHub repository | [github.com/maha-rk/pact](https://github.com/maha-rk/pact) |
 | Live demo (primary) | [pact-q2ej.onrender.com](https://pact-q2ej.onrender.com) — Render free tier, no card required; spins down after 15 min idle, ~1 min cold start on the next request |
 | Live demo (fallback) | [epidemic-either-promoter.ngrok-free.dev](https://epidemic-either-promoter.ngrok-free.dev) — always warm, but tied to the operator's machine staying on; free-tier ngrok subdomain rotates on restart, **reconfirm this URL immediately before final submission** |
-| Demo video | _— add before final submission —_ |
+| Demo video | [Watch on YouTube](https://youtu.be/ijGDs1H-jbE) |
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/maha-rk/pact)
 
@@ -332,6 +332,18 @@ flowchart LR
     CORE <-->|real HTTP negotiation| AZURE["Azure Vendor Agent<br/>real Azure Retail Prices API"]
     CORE -.->|scaffolded, not yet live| OTHER["GCP / RunPod<br/>Vendor Agents"]
     CORE --> DECISION["Decision + Evidence + Reasoning<br/>held for human approval"]
+
+    classDef user fill:#EEF2FF,stroke:#4F46E5,stroke-width:2px,color:#1E1B4B
+    classDef core fill:#7C3AED,stroke:#4C1D95,stroke-width:2px,color:#FFFFFF
+    classDef vendor fill:#DBEAFE,stroke:#0284C7,stroke-width:2px,color:#0C4A6E
+    classDef scaffold fill:#F1F5F9,stroke:#94A3B8,stroke-width:2px,stroke-dasharray:4 3,color:#475569
+    classDef decision fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D
+
+    class USER user
+    class CORE core
+    class AWS,AZURE vendor
+    class OTHER scaffold
+    class DECISION decision
 ```
 
 The six agents (Buyer, Discovery, Negotiation, Verification, Compliance,

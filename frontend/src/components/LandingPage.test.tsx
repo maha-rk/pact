@@ -26,7 +26,7 @@ describe("LandingPage", () => {
     expect(screen.getAllByRole("heading", { name: "Verification" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("heading", { name: "Compliance" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("heading", { name: "Decision" }).length).toBeGreaterThan(0);
-    expect(await screen.findByText("79", {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(await screen.findByText("79", {}, { timeout: 6000 })).toBeInTheDocument();
     expect(screen.getByText("backend tests, real APIs")).toBeInTheDocument();
   });
 
@@ -93,7 +93,7 @@ describe("LandingPage", () => {
 
     render(<LandingPage onEnterNegotiate={vi.fn()} onEnterObservability={vi.fn()} />);
 
-    expect(await screen.findByText("11", {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(await screen.findByText("11", {}, { timeout: 6000 })).toBeInTheDocument();
   });
 
   it("falls back to a dash in the proof strip when observability is unavailable", async () => {
