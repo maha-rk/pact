@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { createNegotiation, parseRequirementFromImage, parseRequirementFromText } from "./api";
 import type { NegotiationState } from "./types";
@@ -60,6 +60,12 @@ function IconChart() {
 
 function App() {
   const [view, setView] = useState<View>("landing");
+  // The landing page's "How it works" / "Evidence" nav links are
+  // anchors into content that only exists when the landing page is
+  // mounted. From inside the app, clicking them needs to switch views
+  // first and then scroll once that content actually renders --
+  // hence the pending target instead of a plain href.
+  const [pendingScrollTarget, setPendingScrollTarget] = useState<string | null>(null);
   const [form, setForm] = useState(FLAGSHIP_DEFAULTS);
   const [state, setState] = useState<NegotiationState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -70,6 +76,18 @@ function App() {
   const [intakeBusy, setIntakeBusy] = useState(false);
   const [listening, setListening] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (view !== "landing" || !pendingScrollTarget) return;
+    const el = document.getElementById(pendingScrollTarget);
+    el?.scrollIntoView();
+    setPendingScrollTarget(null);
+  }, [view, pendingScrollTarget]);
+
+  const goToLandingSection = (id: string) => {
+    setPendingScrollTarget(id);
+    setView("landing");
+  };
 
   const applyParsedRequirement = (parsed: ParsedRequirement) => {
     const found: string[] = [];
@@ -177,16 +195,34 @@ function App() {
   }
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <button type="button" className="sidebar-brand" onClick={() => setView("landing")}>
+    <div className="app-shell">
+      <header className="app-topbar">
+        <button type="button" className="app-brand" onClick={() => setView("landing")}>
           <PactMark size={28} />
           <span className="brand-name">Pact</span>
         </button>
-        <nav className="sidebar-nav">
+        <nav className="landing-nav">
+          <button type="button" onClick={() => goToLandingSection("how-it-works")}>How it works</button>
+          <button type="button" onClick={() => setView("negotiate")}>Live Negotiation</button>
+          <button type="button" onClick={() => goToLandingSection("evidence")}>Evidence</button>
+          <a href="https://github.com/maha-rk/pact/blob/main/docs/PRD.md" target="_blank" rel="noreferrer">PRD</a>
+          <a href="https://github.com/maha-rk/pact/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noreferrer">Architecture</a>
+        </nav>
+        <a
+          className="app-topbar-link"
+          href="https://github.com/maha-rk/pact"
+          target="_blank"
+          rel="noreferrer"
+        >
+          View source on GitHub
+        </a>
+      </header>
+
+      <div className="app-toggle-row">
+        <div className="app-toggle">
           <button
             type="button"
-            className={`nav-item ${view === "negotiate" ? "active" : ""}`}
+            className={`app-toggle-item ${view === "negotiate" ? "active" : ""}`}
             onClick={() => setView("negotiate")}
           >
             <IconNegotiate />
@@ -194,17 +230,14 @@ function App() {
           </button>
           <button
             type="button"
-            className={`nav-item ${view === "observability" ? "active" : ""}`}
+            className={`app-toggle-item ${view === "observability" ? "active" : ""}`}
             onClick={() => setView("observability")}
           >
             <IconChart />
             Observability
           </button>
-        </nav>
-        <div className="sidebar-footer">
-          <p>Autonomous B2B procurement negotiation</p>
         </div>
-      </aside>
+      </div>
 
       <div className="main">
         <header className="topbar">

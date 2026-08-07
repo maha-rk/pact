@@ -49,12 +49,12 @@ describe("App", () => {
     expect(await screen.findByText(/nothing real to/)).toBeInTheDocument();
   });
 
-  it("returns to the landing page when the sidebar brand is clicked", async () => {
+  it("returns to the landing page when the app brand is clicked", async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
     await enterNegotiate(user);
 
-    const brandButton = container.querySelector(".sidebar-brand");
+    const brandButton = container.querySelector(".app-brand");
     expect(brandButton).not.toBeNull();
     await user.click(brandButton as HTMLElement);
 

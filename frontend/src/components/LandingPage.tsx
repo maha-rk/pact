@@ -566,55 +566,32 @@ function HowPactWorks({ onEnterNegotiate }: { onEnterNegotiate: () => void }) {
 // compliant" claim -- compliance can and does fail (that's the AWS
 // rejection in the flagship scenario), so the honest framing is how
 // often the gate actually catches something, not a false 100% claim.
+// Deliberately static -- these four labels are fixed captions, not a
+// live readout. Live figures already have a home (the proof strip and
+// the "How Pact Works" stats below), so these don't swap out from
+// under the reader while the page loads.
 function TrustStats() {
-  const [data, setData] = useState<ObservabilitySummary | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getObservabilitySummary()
-      .then((result) => {
-        if (!cancelled) setData(result);
-      })
-      .catch(() => {
-        if (!cancelled) setData(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const negotiations = data?.available ? data.negotiations : null;
-  const catchRate = negotiations?.claim_mismatch_catch_rate;
-  const rejectionRate = negotiations?.compliance_rejection_rate;
-  const totalRuns = negotiations?.total_runs;
-
-  const verificationDetail =
-    catchRate != null ? `${Math.round(catchRate * 100)}% mismatch catch rate` : "Independently verified";
-  const complianceDetail =
-    rejectionRate != null ? `${Math.round(rejectionRate * 100)}% rejected on policy` : "Hard policy gate";
-  const evidenceDetail = totalRuns != null ? `${totalRuns} decisions logged` : "Audit-ready";
-
   return (
     <ul className="trust-badges">
       <li>
         <IconShieldCheck />
         <div>
           <span className="trust-badge-title">Claim verification</span>
-          <span className="trust-badge-detail">{verificationDetail}</span>
+          <span className="trust-badge-detail">Independently verified</span>
         </div>
       </li>
       <li>
         <IconScales />
         <div>
           <span className="trust-badge-title">Policy enforcement</span>
-          <span className="trust-badge-detail">{complianceDetail}</span>
+          <span className="trust-badge-detail">Hard policy gate</span>
         </div>
       </li>
       <li>
         <IconDocument />
         <div>
           <span className="trust-badge-title">Evidence trails</span>
-          <span className="trust-badge-detail">{evidenceDetail}</span>
+          <span className="trust-badge-detail">Audit-ready</span>
         </div>
       </li>
       <li>
@@ -875,7 +852,7 @@ function OneNegotiationExplained() {
     <section className="landing-section landing-section-alt" id="example">
       <div className="landing-section-inner">
         <p className="landing-section-eyebrow">One real negotiation, fully explained</p>
-        <h2>The flagship scenario</h2>
+        <h2>The Flagship Scenario</h2>
         <p className="landing-section-lede">
           These are the actual figures from Pact's canonical demo scenario —
           reproduce them yourself with{" "}
@@ -937,8 +914,8 @@ function NoScoring() {
   return (
     <section className="landing-section" id="evidence">
       <div className="landing-section-inner">
-        <p className="landing-section-eyebrow">Why not a score</p>
-        <h2>Pact doesn't score vendors</h2>
+        <p className="landing-section-eyebrow landing-section-eyebrow-light">Why not a score</p>
+        <h2>Pact doesn't Score Vendors</h2>
         <div className="noscoring-grid">
           <div className="noscoring-column">
             <h3>What most tools produce</h3>
@@ -961,7 +938,7 @@ function NoScoring() {
               system can independently check, presented with false precision.
             </p>
           </div>
-          <div className="noscoring-column">
+          <div className="noscoring-column noscoring-column-pact">
             <h3>What Pact produces</h3>
             <p className="noscoring-body">
               Every claim verified against real external data. Policy applied
@@ -990,7 +967,7 @@ export function LandingPage({ onEnterNegotiate, onEnterObservability }: Props) {
         </div>
         <nav className="landing-nav">
           <a href="#how-it-works">How it works</a>
-          <a href="#example">Example</a>
+          <button type="button" onClick={onEnterNegotiate}>Live Negotiation</button>
           <a href="#evidence">Evidence</a>
           <a href="https://github.com/maha-rk/pact/blob/main/docs/PRD.md" target="_blank" rel="noreferrer">PRD</a>
           <a href="https://github.com/maha-rk/pact/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noreferrer">Architecture</a>

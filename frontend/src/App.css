@@ -1,34 +1,34 @@
-/* App shell: fixed sidebar + scrollable main column (Linear/Stripe-style
-   dashboard layout, replacing the earlier single centered column). */
+/* App shell: top nav bar + a segmented toggle row right beneath it for
+   Negotiate/Observability, replacing the earlier persistent left
+   sidebar -- the app now reads as one continuous page with the
+   landing site, not a separate dashboard chrome. */
 
-.shell {
+.app-shell {
   display: flex;
+  flex-direction: column;
   min-height: 100svh;
   width: 100%;
 }
 
-.sidebar {
-  width: 240px;
-  flex-shrink: 0;
-  background: var(--bg);
-  border-right: 1px solid var(--border);
+.app-topbar {
   display: flex;
-  flex-direction: column;
-  padding: 20px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
   position: sticky;
   top: 0;
-  height: 100svh;
+  z-index: 10;
 }
 
-.sidebar-brand {
+.app-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 8px 24px;
   background: none;
   border: none;
   cursor: pointer;
-  text-align: left;
 }
 
 .brand-name {
@@ -38,52 +38,65 @@
   letter-spacing: -0.2px;
 }
 
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.app-topbar-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-600);
+  text-decoration: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
 }
 
-.nav-item {
+.app-topbar-link:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+}
+
+.app-toggle-row {
+  display: flex;
+  justify-content: center;
+  padding: 14px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+
+.app-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+
+.app-toggle-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  text-align: left;
-  background: transparent;
+  gap: 8px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
+  background: transparent;
   color: var(--gray-600);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
-  padding: 9px 10px;
+  padding: 8px 16px;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.nav-item:hover {
+.app-toggle-item:hover:not(.active) {
   background: var(--gray-100);
   color: var(--text-h);
 }
 
-.nav-item.active {
-  background: var(--accent-bg);
-  color: var(--accent);
+.app-toggle-item.active {
+  background: var(--accent);
+  color: #fff;
 }
 
-.nav-item svg {
+.app-toggle-item svg {
   flex-shrink: 0;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  padding: 12px 8px 4px;
-  border-top: 1px solid var(--border);
-}
-
-.sidebar-footer p {
-  font-size: 12px;
-  color: var(--gray-400);
-  line-height: 145%;
 }
 
 .main {
@@ -672,24 +685,12 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
-  .shell {
-    flex-direction: column;
+  .app-topbar,
+  .app-toggle-row {
+    padding-left: 20px;
+    padding-right: 20px;
   }
-  .sidebar {
-    width: 100%;
-    height: auto;
-    position: static;
-    flex-direction: row;
-    align-items: center;
-    padding: 12px 16px;
-  }
-  .sidebar-brand {
-    padding: 0 12px 0 0;
-  }
-  .sidebar-nav {
-    flex-direction: row;
-  }
-  .sidebar-footer {
+  .app-topbar-link {
     display: none;
   }
   .topbar,

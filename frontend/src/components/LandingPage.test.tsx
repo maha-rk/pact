@@ -37,7 +37,7 @@ describe("LandingPage", () => {
     expect(screen.getByText("The Flagship Scenario")).toBeInTheDocument();
     expect(screen.getByText("$39,246.20")).toBeInTheDocument();
     expect(screen.getByText("No such discount tier exists under 12 months", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("Pact doesn't score vendors")).toBeInTheDocument();
+    expect(screen.getByText("Pact doesn't Score Vendors")).toBeInTheDocument();
   });
 
   it("renders the why-trust section, leading with why before how or proof", () => {
