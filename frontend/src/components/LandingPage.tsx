@@ -480,7 +480,7 @@ function HowPactWorks({ onEnterNegotiate }: { onEnterNegotiate: () => void }) {
     <section className="landing-section landing-section-alt" id="how-it-works">
       <div className="landing-section-inner">
         <h2 className="process-heading">
-          The 6-Step Process: From requirement to decision, <span className="landing-section-accent">in seconds</span>
+          The 6-Step Process: From Requirement to Decision, <span className="landing-section-accent">in Seconds</span>
         </h2>
         <p className="landing-section-lede process-lede">
           Pact is your AI-native procurement copilot — it streamlines negotiation and compliance
