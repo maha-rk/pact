@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LandingPage } from "./LandingPage";
 import * as api from "../api";
@@ -15,13 +15,17 @@ describe("LandingPage", () => {
     });
   });
 
-  it("renders the hero, all three cards, and the proof strip", async () => {
+  it("renders the hero, the how-it-works steps, and the proof strip", async () => {
     render(<LandingPage onEnterNegotiate={vi.fn()} onEnterObservability={vi.fn()} />);
 
-    expect(screen.getByText("Which vendor's claimed discount is real?")).toBeInTheDocument();
-    expect(screen.getByText("What Pact does")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "How it works" })).toBeInTheDocument();
-    expect(screen.getByText("Try the flagship scenario")).toBeInTheDocument();
+    expect(screen.getByText("Autonomous procurement for the agent economy.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "The 6-Step Process: From requirement to decision, in seconds" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Buyer" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Discovery" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Negotiation" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Verification" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: "Compliance" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: "Decision" }).length).toBeGreaterThan(0);
     expect(await screen.findByText("79", {}, { timeout: 2000 })).toBeInTheDocument();
     expect(screen.getByText("backend tests, real APIs")).toBeInTheDocument();
   });
@@ -29,20 +33,35 @@ describe("LandingPage", () => {
   it("renders the Today vs. Pact, flagship walkthrough, and no-scoring sections with real content", () => {
     render(<LandingPage onEnterNegotiate={vi.fn()} onEnterObservability={vi.fn()} />);
 
-    expect(screen.getByText("Today vs. with Pact")).toBeInTheDocument();
+    expect(screen.getByText("From Spreadsheets to Agents")).toBeInTheDocument();
     expect(screen.getByText("The flagship scenario")).toBeInTheDocument();
     expect(screen.getByText("$39,246.20")).toBeInTheDocument();
     expect(screen.getByText("No such discount tier exists under 12 months", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Pact doesn't score vendors")).toBeInTheDocument();
   });
 
-  it("calls onEnterNegotiate from both the hero and the CTA card", async () => {
+  it("renders the why-trust section, leading with why before how or proof", () => {
+    const { container } = render(<LandingPage onEnterNegotiate={vi.fn()} onEnterObservability={vi.fn()} />);
+
+    expect(screen.getByText("Why Agent Commerce Needs Trust")).toBeInTheDocument();
+    const trustSection = container.querySelector("#trust") as HTMLElement;
+    expect(within(trustSection).getByRole("heading", { name: "Verification" })).toBeInTheDocument();
+    expect(within(trustSection).getByRole("heading", { name: "Compliance" })).toBeInTheDocument();
+    expect(within(trustSection).getByRole("heading", { name: "Evidence" })).toBeInTheDocument();
+
+    const sectionIds = Array.from(container.querySelectorAll("section[id]")).map((el) => el.id);
+    expect(sectionIds.indexOf("trust")).toBeLessThan(sectionIds.indexOf("how-it-works"));
+    expect(sectionIds.indexOf("trust")).toBeLessThan(sectionIds.indexOf("comparison"));
+    expect(sectionIds.indexOf("how-it-works")).toBeLessThan(sectionIds.indexOf("example"));
+  });
+
+  it("calls onEnterNegotiate from both the hero and the how-it-works CTA", async () => {
     const user = userEvent.setup();
     const onEnterNegotiate = vi.fn();
     render(<LandingPage onEnterNegotiate={onEnterNegotiate} onEnterObservability={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "Start a negotiation →" }));
-    await user.click(screen.getByRole("button", { name: "Open the negotiation console →" }));
+    await user.click(screen.getByRole("button", { name: "Try the flagship scenario →" }));
 
     expect(onEnterNegotiate).toHaveBeenCalledTimes(2);
   });
@@ -52,7 +71,7 @@ describe("LandingPage", () => {
     const onEnterObservability = vi.fn();
     render(<LandingPage onEnterNegotiate={vi.fn()} onEnterObservability={onEnterObservability} />);
 
-    await user.click(screen.getByRole("button", { name: "See live results" }));
+    await user.click(screen.getByRole("button", { name: "See live results →" }));
 
     expect(onEnterObservability).toHaveBeenCalledTimes(1);
   });
@@ -75,7 +94,6 @@ describe("LandingPage", () => {
     render(<LandingPage onEnterNegotiate={vi.fn()} onEnterObservability={vi.fn()} />);
 
     expect(await screen.findByText("11", {}, { timeout: 2000 })).toBeInTheDocument();
-    expect(await screen.findByText("64%", {}, { timeout: 2000 })).toBeInTheDocument();
   });
 
   it("falls back to a dash in the proof strip when observability is unavailable", async () => {

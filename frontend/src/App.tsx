@@ -7,6 +7,7 @@ import { DecisionView } from "./components/DecisionView";
 import { ReplayTimeline } from "./components/ReplayTimeline";
 import { ObservabilityDashboard } from "./components/ObservabilityDashboard";
 import { LandingPage } from "./components/LandingPage";
+import { PactMark } from "./components/PactMark";
 
 // Non-standard browser API (Chrome/Edge/Safari); no official TS lib types.
 type SpeechRecognitionLike = {
@@ -179,7 +180,7 @@ function App() {
     <div className="shell">
       <aside className="sidebar">
         <button type="button" className="sidebar-brand" onClick={() => setView("landing")}>
-          <span className="brand-mark">P</span>
+          <PactMark size={28} />
           <span className="brand-name">Pact</span>
         </button>
         <nav className="sidebar-nav">

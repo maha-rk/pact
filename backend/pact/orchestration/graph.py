@@ -197,10 +197,21 @@ def run_negotiation_and_decision_phase(
         round_compliant: list[tuple[Offer, object, object]] = []
         for offer, verification in round_price_acceptable:
             vendor_certs = agent_cards[offer.vendor_id].certifications
+            vendor_renewable_pct = agent_cards[offer.vendor_id].renewable_energy_pct
             if compliance_client is not None:
-                compliance = compliance_client.check_compliance(offer, policy, vendor_certifications=vendor_certs)
+                compliance = compliance_client.check_compliance(
+                    offer,
+                    policy,
+                    vendor_certifications=vendor_certs,
+                    vendor_renewable_energy_pct=vendor_renewable_pct,
+                )
             else:
-                compliance = compliance_agent.check_compliance(offer, policy, vendor_certifications=vendor_certs)
+                compliance = compliance_agent.check_compliance(
+                    offer,
+                    policy,
+                    vendor_certifications=vendor_certs,
+                    vendor_renewable_energy_pct=vendor_renewable_pct,
+                )
             state.compliance_results.append(compliance)
             if compliance.passed:
                 state.log(

@@ -41,9 +41,25 @@ VENDOR_ENDPOINTS = {
     VendorId.AWS: "http://localhost:9001",
     VendorId.AZURE: "http://localhost:9002",
 }
+# Mirrors each vendor's own self-declared AGENT_CARD (vendors/*/app.py) --
+# see the matching comment in pact/api/routes_negotiation.py.
 AGENT_CARDS = {
-    vid: AgentCard(vendor_id=vid, name=f"{vid.value.upper()} Vendor Agent", endpoint=ep, capabilities=["negotiate"])
-    for vid, ep in VENDOR_ENDPOINTS.items()
+    VendorId.AWS: AgentCard(
+        vendor_id=VendorId.AWS,
+        name="AWS Vendor Agent",
+        endpoint=VENDOR_ENDPOINTS[VendorId.AWS],
+        capabilities=["negotiate"],
+        certifications=["SOC2", "ISO27001"],
+        renewable_energy_pct=100.0,
+    ),
+    VendorId.AZURE: AgentCard(
+        vendor_id=VendorId.AZURE,
+        name="Azure Vendor Agent",
+        endpoint=VENDOR_ENDPOINTS[VendorId.AZURE],
+        capabilities=["negotiate"],
+        certifications=["SOC2", "ISO27001"],
+        renewable_energy_pct=100.0,
+    ),
 }
 
 
@@ -65,6 +81,7 @@ def _handle_message(message) -> None:
             budget_ceiling_usd=payload["budget_ceiling_usd"],
             blocked_vendors=[VendorId(v) for v in payload.get("blocked_vendors", [])],
             required_certifications=payload.get("required_certifications", []),
+            min_renewable_energy_pct=payload.get("min_renewable_energy_pct"),
         )
         initial_claimed_discounts = {VendorId(v): rate for v, rate in payload["initial_claimed_discounts"].items()}
         candidate_vendors = list(initial_claimed_discounts.keys())

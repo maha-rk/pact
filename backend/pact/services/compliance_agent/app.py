@@ -38,6 +38,7 @@ class ComplianceCheckRequest(BaseModel):
     offer: Offer
     policy: PolicyConstraints
     vendor_certifications: list[str] = []
+    vendor_renewable_energy_pct: float | None = None
 
 
 @app.get("/.well-known/agent.json")
@@ -47,4 +48,9 @@ def agent_card() -> dict:
 
 @app.post("/check-compliance")
 def check_compliance(req: ComplianceCheckRequest) -> ComplianceResult:
-    return compliance_agent.check_compliance(req.offer, req.policy, vendor_certifications=req.vendor_certifications)
+    return compliance_agent.check_compliance(
+        req.offer,
+        req.policy,
+        vendor_certifications=req.vendor_certifications,
+        vendor_renewable_energy_pct=req.vendor_renewable_energy_pct,
+    )

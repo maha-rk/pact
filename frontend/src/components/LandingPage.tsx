@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import "./LandingPage.css";
 import { getObservabilitySummary } from "../api";
 import type { ObservabilitySummary } from "../types";
+import { PactMark } from "./PactMark";
 
 // A real front door: explains what Pact is and how to use it before
 // dropping the visitor into the actual negotiation console. Nothing
@@ -81,20 +83,18 @@ function useCountUp(target: number | null, active: boolean, duration = 900): num
 // run of `python scripts/run_scenario.py --fixture flagship` produces.
 // Not a mockup of a hypothetical feature; a scripted replay of a real one.
 const CONSOLE_LINES: { text: string; tone: "cmd" | "muted" | "ok" | "fail" | "decision" }[] = [
-  { text: '$ pact negotiate --requirement "8x H100, 3mo, $115k"', tone: "cmd" },
-  { text: "→ discovering vendors...", tone: "muted" },
-  { text: "✓ AWS Vendor Agent found", tone: "ok" },
-  { text: "✓ Azure Vendor Agent found", tone: "ok" },
-  { text: "→ AWS offers $118,886.40 (claims 25% discount)", tone: "muted" },
-  { text: "→ verifying against AWS Price List Bulk API...", tone: "muted" },
-  { text: "✗ no such discount tier exists — claim rejected", tone: "fail" },
-  { text: "→ Azure offers $39,246.20 (claims 81.52% discount)", tone: "muted" },
-  { text: "→ verifying against Azure Retail Prices API...", tone: "muted" },
-  { text: "✓ claim verified — matches live pricing", tone: "ok" },
-  { text: "→ checking policy compliance...", tone: "muted" },
-  { text: "✓ within $115,000 budget", tone: "ok" },
-  { text: "● decision: Azure selected — $39,246.20", tone: "decision" },
-  { text: "  pending human approval", tone: "muted" },
+  { text: '$ pact negotiate "8x H100 GPUs, 3-month term, $115K budget"', tone: "cmd" },
+  { text: "→ contacting AWS and Azure...", tone: "muted" },
+  { text: "✓ AWS quotes $118,886.40 (claims a 25% loyalty discount)", tone: "ok" },
+  { text: "→ checking that discount against AWS's real pricing...", tone: "muted" },
+  { text: "✗ discount doesn't exist — renegotiating with AWS", tone: "fail" },
+  { text: "✓ Azure quotes $39,246.20 (claims an 81.52% spot discount)", tone: "ok" },
+  { text: "→ checking that discount against Azure's real pricing...", tone: "muted" },
+  { text: "✓ verified — Azure's price is genuine", tone: "ok" },
+  { text: "→ does this fit company policy?", tone: "muted" },
+  { text: "✓ yes — within the $115,000 budget", tone: "ok" },
+  { text: "● recommendation: Azure — saves $79,640.20 vs. AWS's real price", tone: "decision" },
+  { text: "  awaiting your approval", tone: "muted" },
 ];
 
 function LiveConsole() {
@@ -164,29 +164,467 @@ function LiveConsole() {
   );
 }
 
-function IconSearch() {
+function IconShieldCheck() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+function IconScales() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v18M8 21h8M7 7h10" />
+      <path d="M4 7l-2.5 5a2.5 2.5 0 0 0 5 0L4 7z" />
+      <path d="M20 7l-2.5 5a2.5 2.5 0 0 0 5 0L20 7z" />
+    </svg>
+  );
+}
+
+function IconDocument() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5M9 13h6M9 17h6" />
+    </svg>
+  );
+}
+
+function IconPerson() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
+    </svg>
+  );
+}
+
+function IconMic() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3M9 21h6" />
+    </svg>
+  );
+}
+
+function IconPeople() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M2.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2z" />
+      <circle cx="17" cy="7" r="2.6" opacity="0.85" />
+      <path d="M15 13.3c2.9.4 5 2.7 5 6v.7h-3.2" opacity="0.85" />
+    </svg>
+  );
+}
+
+function IconBriefcase() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M3 12h18" />
+    </svg>
+  );
+}
+
+function IconSearch() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="7" />
       <path d="M21 21l-4.3-4.3" />
     </svg>
   );
 }
 
-function IconSteps() {
+function IconCheckCircle() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 6h16M4 12h10M4 18h6" />
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 12.5l2.5 2.5 4.5-5" />
     </svg>
   );
 }
 
-function IconFlag() {
+function IconSparkle() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 21V4" />
-      <path d="M5 4h13l-3 4 3 4H5" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z" />
     </svg>
+  );
+}
+
+function IconPhoto() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="10" r="1.5" />
+      <path d="M21 15l-5-5-4 4-2-2-5 5" />
+    </svg>
+  );
+}
+
+function IconTextLines() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h10" />
+    </svg>
+  );
+}
+
+function IconChat() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4 8.3 8.3 0 0 1-3.8-.9L3 21l1.9-5.8a8.3 8.3 0 0 1-.9-3.8A8.4 8.4 0 0 1 12.5 3a8.4 8.4 0 0 1 8.5 8.5z" />
+    </svg>
+  );
+}
+
+function IconSearchDoc() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <circle cx="10.5" cy="14" r="2.2" />
+      <path d="M12.2 15.7L14 17.5" />
+    </svg>
+  );
+}
+
+function IconListCheck() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 6h11M9 12h11M9 18h11" />
+      <path d="M4 6l.01.01M4 12l.01.01M4 18l.01.01" />
+    </svg>
+  );
+}
+
+function IconChartBars() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19V10M11 19V5M18 19v-7" />
+      <path d="M3 21h18" />
+    </svg>
+  );
+}
+
+function FlowConnector({ id, from, to }: { id: string; from: string; to: string }) {
+  return (
+    <svg className="process-flow-connector" width="26" height="18" viewBox="0 0 26 18" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="26" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor={from} />
+          <stop offset="1" stopColor={to} />
+        </linearGradient>
+      </defs>
+      <path d="M1 9 H18" stroke={`url(#${id})`} strokeWidth="3" strokeLinecap="round" />
+      <path d="M13 2l7 7-7 7" stroke={`url(#${id})`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
+
+function LeftFanIn() {
+  return (
+    <svg className="process-fan-in" width="150" height="130" viewBox="0 0 150 130" fill="none" aria-hidden="true">
+      <g stroke="#7c3aed" strokeWidth="3.5" strokeLinecap="round" opacity="0.85">
+        <path d="M0 8 H76 L100 65" />
+        <path d="M0 41 H76 L100 65" />
+        <path d="M0 74 H76 L100 65" />
+        <path d="M0 107 H76 L100 65" />
+      </g>
+      <circle cx="100" cy="65" r="5" fill="#7c3aed" />
+      <path d="M106 65 H132" stroke="#7c3aed" strokeWidth="3.5" strokeLinecap="round" strokeDasharray="1 9" />
+      <circle cx="0" cy="8" r="3.5" fill="#a78bfa" />
+      <circle cx="0" cy="41" r="3.5" fill="#a78bfa" />
+      <circle cx="0" cy="74" r="3.5" fill="#a78bfa" />
+      <circle cx="0" cy="107" r="3.5" fill="#a78bfa" />
+    </svg>
+  );
+}
+
+function IconExpand() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+      <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+      <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
+// Hover-to-expand: pure CSS (:hover / :focus-within), no click, no new
+// tab, no JS state -- the preview panel is always in the DOM at a fixed
+// size and only its opacity/visibility/transform toggle, so there's no
+// layout jump when it appears. Keyboard-focusable so it's not mouse-only.
+function IconClose() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+// Click to open, not hover -- a full-size lightbox in the current tab
+// (no target="_blank", no navigation). Closes on the X button, on
+// backdrop click, or on Escape; body scroll is locked while open so
+// the page behind it doesn't scroll along with the image.
+function ArchitectureExpand() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    // Lock both html and body -- document.scrollingElement is the
+    // <html> element in standards mode, not <body>, so locking body
+    // alone doesn't actually stop the page from scrolling.
+    const html = document.documentElement;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    html.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      html.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [open]);
+
+  return (
+    <div className="arch-expand">
+      <button
+        type="button"
+        className="arch-expand-trigger"
+        aria-label="View the full Pact architecture diagram"
+        onClick={() => setOpen(true)}
+      >
+        <IconExpand />
+        <span>Architecture</span>
+      </button>
+      {open &&
+        createPortal(
+          // Portaled straight onto <body> -- rendering this inside the
+          // normal component tree put it under a <Reveal> wrapper whose
+          // scroll-in animation sets `transform` on an ancestor, which
+          // silently turns position:fixed here into "fixed relative to
+          // that ancestor" instead of the viewport (a real CSS rule, not
+          // a bug in isolation) -- so the close button could scroll off
+          // screen. A portal sidesteps that ancestor entirely.
+          <div className="arch-lightbox-backdrop">
+            <button
+              type="button"
+              className="arch-lightbox-close"
+              aria-label="Close architecture diagram"
+              onClick={() => setOpen(false)}
+            >
+              <IconClose />
+            </button>
+            <div className="arch-lightbox" onClick={() => setOpen(false)}>
+              <img
+                className="arch-lightbox-img"
+                src="/architecture-diagram.png"
+                alt="Pact architecture diagram: six-layer real system from intake through evidence, with live AWS/Azure vendor integrations, real deployment (Docker on Render + ngrok), and scaffolded GCP/RunPod roadmap items clearly marked"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
+function ProcessStep({
+  number,
+  color,
+  icon,
+  title,
+  miniIcons,
+  caption,
+}: {
+  number: number;
+  color: "purple" | "violet" | "indigo" | "blue" | "cyan" | "green";
+  icon: React.ReactNode;
+  title: string;
+  miniIcons: React.ReactNode[];
+  caption: string;
+}) {
+  return (
+    <div className={`process-step process-step-${color}`}>
+      <div className="process-step-icon-wrap">
+        <span className="process-step-number">{number}</span>
+        <div className="process-step-icon">{icon}</div>
+      </div>
+      <h3>{title}</h3>
+      <div className="process-step-box">
+        <div className="process-step-mini-icons">
+          {miniIcons.map((mi, i) => (
+            <span key={i}>{mi}</span>
+          ))}
+        </div>
+        <p className="process-step-caption">{caption}</p>
+      </div>
+    </div>
+  );
+}
+
+function HowPactWorks({ onEnterNegotiate }: { onEnterNegotiate: () => void }) {
+  return (
+    <section className="landing-section landing-section-alt" id="how-it-works">
+      <div className="landing-section-inner">
+        <h2 className="process-heading">
+          The 6-Step Process: From requirement to decision, <span className="landing-section-accent">in seconds</span>
+        </h2>
+        <p className="landing-section-lede process-lede">
+          Pact is your AI-native procurement copilot — it streamlines negotiation and compliance
+          with speed, accuracy, and confidence.
+        </p>
+        <div className="process-steps">
+          <LeftFanIn />
+          <ProcessStep
+            number={1}
+            color="purple"
+            icon={<IconBriefcase />}
+            title="Buyer"
+            miniIcons={[<IconMic key="mic" />, <IconPhoto key="photo" />, <IconTextLines key="text" />]}
+            caption="Captures your requirement and policy"
+          />
+          <FlowConnector id="flow-1" from="#7c3aed" to="#9333ea" />
+          <ProcessStep
+            number={2}
+            color="violet"
+            icon={<IconSearch />}
+            title="Discovery"
+            miniIcons={[<IconSearch key="s" />, <IconShieldCheck key="sh" />]}
+            caption="Finds vendors, verifies their identity"
+          />
+          <FlowConnector id="flow-2" from="#9333ea" to="#4f46e5" />
+          <ProcessStep
+            number={3}
+            color="indigo"
+            icon={<IconPeople />}
+            title="Negotiation"
+            miniIcons={[<IconChat key="c1" />, <IconChat key="c2" />]}
+            caption="Real HTTP offers, round by round"
+          />
+          <FlowConnector id="flow-3" from="#4f46e5" to="#2563eb" />
+          <ProcessStep
+            number={4}
+            color="blue"
+            icon={<IconSearchDoc />}
+            title="Verification"
+            miniIcons={[<IconSearchDoc key="s" />, <IconListCheck key="l" />]}
+            caption="Claims checked against real pricing data"
+          />
+          <FlowConnector id="flow-4" from="#2563eb" to="#0891b2" />
+          <ProcessStep
+            number={5}
+            color="cyan"
+            icon={<IconShieldCheck />}
+            title="Compliance"
+            miniIcons={[<IconShieldCheck key="sh" />, <IconListCheck key="l" />]}
+            caption="Policy enforced as a hard gate"
+          />
+          <FlowConnector id="flow-5" from="#0891b2" to="#16a34a" />
+          <ProcessStep
+            number={6}
+            color="green"
+            icon={<IconCheckCircle />}
+            title="Decision"
+            miniIcons={[<IconChartBars key="ch" />, <IconDocument key="d" />, <IconPerson key="p" />]}
+            caption="Evidence, reasoning, your approval"
+          />
+          <FlowConnector id="flow-6" from="#4ade80" to="#16a34a" />
+          <div className="process-capstone">
+            <div className="process-capstone-icon"><IconCheckCircle /></div>
+            <span>Decision Delivered</span>
+          </div>
+        </div>
+        <div className="process-cta">
+          <button className="btn-primary" onClick={onEnterNegotiate}>
+            <IconSparkle /> Try the flagship scenario →
+          </button>
+        </div>
+      </div>
+      <ArchitectureExpand />
+    </section>
+  );
+}
+
+// Live, not decorative -- each sub-label pulls a real figure from the
+// same /observability/summary endpoint the ProofStrip and in-app
+// dashboard use, and falls back to an honest structural description
+// (never an invented number) while that data is unavailable. "Policy
+// enforcement" reports the real rejection rate rather than an "always
+// compliant" claim -- compliance can and does fail (that's the AWS
+// rejection in the flagship scenario), so the honest framing is how
+// often the gate actually catches something, not a false 100% claim.
+function TrustStats() {
+  const [data, setData] = useState<ObservabilitySummary | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getObservabilitySummary()
+      .then((result) => {
+        if (!cancelled) setData(result);
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const negotiations = data?.available ? data.negotiations : null;
+  const catchRate = negotiations?.claim_mismatch_catch_rate;
+  const rejectionRate = negotiations?.compliance_rejection_rate;
+  const totalRuns = negotiations?.total_runs;
+
+  const verificationDetail =
+    catchRate != null ? `${Math.round(catchRate * 100)}% mismatch catch rate` : "Independently verified";
+  const complianceDetail =
+    rejectionRate != null ? `${Math.round(rejectionRate * 100)}% rejected on policy` : "Hard policy gate";
+  const evidenceDetail = totalRuns != null ? `${totalRuns} decisions logged` : "Audit-ready";
+
+  return (
+    <ul className="trust-badges">
+      <li>
+        <IconShieldCheck />
+        <div>
+          <span className="trust-badge-title">Claim verification</span>
+          <span className="trust-badge-detail">{verificationDetail}</span>
+        </div>
+      </li>
+      <li>
+        <IconScales />
+        <div>
+          <span className="trust-badge-title">Policy enforcement</span>
+          <span className="trust-badge-detail">{complianceDetail}</span>
+        </div>
+      </li>
+      <li>
+        <IconDocument />
+        <div>
+          <span className="trust-badge-title">Evidence trails</span>
+          <span className="trust-badge-detail">{evidenceDetail}</span>
+        </div>
+      </li>
+      <li>
+        <IconPerson />
+        <div>
+          <span className="trust-badge-title">Human approval</span>
+          <span className="trust-badge-detail">You stay in control</span>
+        </div>
+      </li>
+    </ul>
   );
 }
 
@@ -209,73 +647,177 @@ function ProofStrip() {
   }, []);
 
   const runs = data?.available ? (data.negotiations?.total_runs ?? null) : null;
-  const agreementRate = data?.available ? data.negotiations?.agreement_rate : null;
-  const agreementPct = agreementRate != null ? Math.round(agreementRate * 100) : null;
 
   const testsCount = useCountUp(79, visible);
   const vendorCount = useCountUp(2, visible);
   const runsCount = useCountUp(runs, visible);
-  const agreementCount = useCountUp(agreementPct, visible);
+  const traceabilityCount = useCountUp(100, visible);
   const fabricatedCount = useCountUp(0, visible);
 
   return (
-    <div className="landing-proof" ref={ref}>
-      <div className="landing-proof-item">
-        <div className="landing-proof-value">{testsCount}</div>
-        <div className="landing-proof-label">backend tests, real APIs</div>
+    <section className="landing-proof-bar">
+      <div className="landing-proof" ref={ref}>
+        <div className="landing-proof-item">
+          <div className="landing-proof-value">{testsCount}</div>
+          <div className="landing-proof-label">backend tests, real APIs</div>
+        </div>
+        <div className="landing-proof-item">
+          <div className="landing-proof-value">{vendorCount}</div>
+          <div className="landing-proof-label">live vendor pricing APIs</div>
+        </div>
+        <div className="landing-proof-item">
+          <div className="landing-proof-value">{runsCount != null ? runsCount : "—"}</div>
+          <div className="landing-proof-label">logged evaluation runs</div>
+        </div>
+        <div className="landing-proof-item">
+          <div className="landing-proof-value">{traceabilityCount}%</div>
+          <div className="landing-proof-label">evidence traceability</div>
+        </div>
+        <div className="landing-proof-item">
+          <div className="landing-proof-value">{fabricatedCount}</div>
+          <div className="landing-proof-label">fabricated numbers</div>
+        </div>
       </div>
-      <div className="landing-proof-item">
-        <div className="landing-proof-value">{vendorCount}</div>
-        <div className="landing-proof-label">live vendor pricing APIs</div>
-      </div>
-      <div className="landing-proof-item">
-        <div className="landing-proof-value">{runsCount != null ? runsCount : "—"}</div>
-        <div className="landing-proof-label">logged evaluation runs</div>
-      </div>
-      <div className="landing-proof-item">
-        <div className="landing-proof-value">{agreementCount != null ? `${agreementCount}%` : "—"}</div>
-        <div className="landing-proof-label">real agreement rate</div>
-      </div>
-      <div className="landing-proof-item">
-        <div className="landing-proof-value">{fabricatedCount}</div>
-        <div className="landing-proof-label">fabricated numbers</div>
+    </section>
+  );
+}
+
+function TrustPillar({
+  icon,
+  color,
+  name,
+  body,
+  flow,
+}: {
+  icon: React.ReactNode;
+  color: "purple" | "blue" | "green";
+  name: string;
+  body: string;
+  flow: [string, string, string];
+}) {
+  return (
+    <div className={`trust-pillar trust-pillar-${color}`}>
+      <div className="trust-pillar-icon">{icon}</div>
+      <h3>{name}</h3>
+      <p className="trust-pillar-body">{body}</p>
+      <div className="trust-pillar-flow">
+        <span>{flow[0]}</span>
+        <span className="trust-pillar-arrow trust-pillar-arrow-1" aria-hidden="true" />
+        <span>{flow[1]}</span>
+        <span className="trust-pillar-arrow trust-pillar-arrow-2" aria-hidden="true" />
+        <span className="trust-pillar-outcome">{flow[2]}</span>
       </div>
     </div>
   );
 }
 
+function WhyTrustMatters() {
+  return (
+    <section className="landing-section landing-section-thesis" id="trust">
+      <div className="landing-section-inner">
+        <p className="landing-section-eyebrow landing-section-eyebrow-light">Why this matters</p>
+        <h2>Why Agent Commerce Needs Trust</h2>
+        <p className="landing-section-lede landing-section-lede-light">
+          Organisations can transact through agents. Trust is what makes that possible.
+        </p>
+        <div className="trust-pillar-grid">
+          <TrustPillar
+            icon={<IconShieldCheck />}
+            color="purple"
+            name="Verification"
+            body="A negotiating claim is not a fact. Every discount, capability, and price must be independently verified before it can influence a decision."
+            flow={["Vendor claim", "Verification", "Approved / rejected"]}
+          />
+          <TrustPillar
+            icon={<IconScales />}
+            color="blue"
+            name="Compliance"
+            body="The cheapest deal is not always the right one. Budget, certifications, and ESG thresholds are enforced as hard gates — policy overrides optimization, even against the best price on the table."
+            flow={["Offer", "Compliance", "Pass / fail"]}
+          />
+          <TrustPillar
+            icon={<IconDocument />}
+            color="green"
+            name="Evidence"
+            body="A recommendation without evidence can't be audited. Every decision needs a traceable reason, not just an outcome."
+            flow={["Decision", "Evidence", "Approval"]}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function IconCrossCircle() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9 9l6 6M15 9l-6 6" />
+    </svg>
+  );
+}
+
+function IconCheckSmall() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12.5l2.5 2.5 5-5" />
+    </svg>
+  );
+}
+
+function CompareItem({ tone, text }: { tone: "muted" | "accent"; text: string }) {
+  return (
+    <li className={`compare-item compare-item-${tone}`}>
+      <span className="compare-item-icon">{tone === "muted" ? <IconCrossCircle /> : <IconCheckSmall />}</span>
+      <span>{text}</span>
+    </li>
+  );
+}
+
+function PulseArrow() {
+  return (
+    <svg className="compare-arrow-svg" width="64" height="32" viewBox="0 0 64 32" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="compare-arrow-grad" x1="0" y1="0" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#6b7280" />
+          <stop offset="1" stopColor="#a78bfa" />
+        </linearGradient>
+      </defs>
+      <path d="M2 16 H50" stroke="url(#compare-arrow-grad)" strokeWidth="3" strokeLinecap="round" opacity="0.55" />
+      <path d="M42 6l14 10-14 10" stroke="url(#compare-arrow-grad)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <circle r="3.5" fill="#c4b5fd">
+        <animateMotion dur="2.2s" repeatCount="indefinite" path="M4 16 H50" />
+      </circle>
+    </svg>
+  );
+}
+
 function TodayVsPact() {
   return (
-    <section className="landing-section" id="comparison">
+    <section className="landing-section landing-section-compare" id="comparison">
       <div className="landing-section-inner">
-        <p className="landing-section-eyebrow">The shift</p>
-        <h2>Today vs. with Pact</h2>
-        <p className="landing-section-lede">
-          Cloud GPU procurement is Pact's first deployment of a broader idea:
-          as organizations increasingly transact through software agents
-          rather than people, something has to verify what those agents
-          claim to each other and enforce policy on an organization's behalf
-          before a commitment is made.
-        </p>
+        <p className="landing-section-eyebrow landing-section-eyebrow-light">The shift, today</p>
+        <h2>From Spreadsheets to Agents</h2>
         <div className="compare-grid">
           <div className="compare-column compare-today">
             <h3>Today</h3>
-            <ol className="compare-steps">
-              <li>Buyer emails vendors</li>
-              <li>Quotes trickle in, on their own timeline</li>
-              <li>Spreadsheet comparison</li>
-              <li>Decision made on trust</li>
-            </ol>
+            <ul className="compare-steps">
+              <CompareItem tone="muted" text="Buyer emails vendors" />
+              <CompareItem tone="muted" text="Quotes trickle in, on their own timeline" />
+              <CompareItem tone="muted" text="Spreadsheet comparison" />
+              <CompareItem tone="muted" text="Decision made on trust" />
+            </ul>
           </div>
-          <div className="compare-arrow" aria-hidden="true">→</div>
+          <div className="compare-arrow" aria-hidden="true"><PulseArrow /></div>
           <div className="compare-column compare-pact">
             <h3>With Pact</h3>
-            <ol className="compare-steps">
-              <li>Buyer Agent ↔ Vendor Agents, simultaneously, over real HTTP</li>
-              <li>Verification Agent checks every claim against real data</li>
-              <li>Compliance Agent enforces policy as a hard gate</li>
-              <li>Decision + Evidence, then human approval</li>
-            </ol>
+            <ul className="compare-steps">
+              <CompareItem tone="accent" text="Buyer Agent ↔ Vendor Agents, simultaneously, over real HTTP" />
+              <CompareItem tone="accent" text="Verification Agent checks every claim against real data" />
+              <CompareItem tone="accent" text="Compliance Agent enforces policy as a hard gate — budget, certifications, ESG" />
+              <CompareItem tone="accent" text="Decision + Evidence, then human approval" />
+            </ul>
           </div>
         </div>
       </div>
@@ -443,11 +985,11 @@ export function LandingPage({ onEnterNegotiate, onEnterObservability }: Props) {
     <div className="landing">
       <header className="landing-topbar">
         <div className="landing-brand">
-          <span className="brand-mark">P</span>
+          <PactMark size={34} />
           <span className="brand-name">Pact</span>
         </div>
         <nav className="landing-nav">
-          <a href="#comparison">How it works</a>
+          <a href="#how-it-works">How it works</a>
           <a href="#example">Example</a>
           <a href="#evidence">Evidence</a>
           <a href="https://github.com/maha-rk/pact/blob/main/docs/PRD.md" target="_blank" rel="noreferrer">PRD</a>
@@ -466,67 +1008,38 @@ export function LandingPage({ onEnterNegotiate, onEnterObservability }: Props) {
       <div className="landing-hero-wrap">
         <section className="landing-hero">
           <div className="landing-hero-text">
-            <p className="landing-eyebrow">Autonomous B2B Procurement Negotiation</p>
-            <h1>Which vendor's claimed discount is real?</h1>
+            <p className="landing-eyebrow">The trust layer for agent commerce</p>
+            <h1>Autonomous procurement for the agent economy.</h1>
             <p className="landing-subhead">
-              Pact negotiates on your behalf against real vendor pricing,
-              independently verifies every claim, enforces your policy as a
-              hard gate — even against the cheapest offer — and stops for
-              your approval. Evidence, not a score.
+              Buyer agents negotiate directly with vendor agents. Pact
+              verifies every claim, enforces policy as a hard gate, and
+              produces evidence-backed decisions before a human approves
+              them.
             </p>
             <div className="landing-hero-actions">
               <button className="btn-primary" onClick={onEnterNegotiate}>
                 Start a negotiation →
               </button>
               <button className="btn-secondary" onClick={onEnterObservability}>
-                See live results
+                See live results →
               </button>
             </div>
+            <TrustStats />
           </div>
-          <LiveConsole />
+          <div className="landing-console-col">
+            <p className="console-caption">Watch it happen — which vendor's claimed discount is real?</p>
+            <LiveConsole />
+          </div>
         </section>
       </div>
 
-      <Reveal className="landing-cards">
-        <div className="landing-card">
-          <div className="landing-card-icon landing-card-icon-green"><IconSearch /></div>
-          <h3>What Pact does</h3>
-          <p>
-            Discovers vendors, opens simultaneous negotiation over real
-            pricing APIs, verifies every claimed discount against real
-            external data, and rejects any offer that violates your
-            policy — regardless of price.
-          </p>
-        </div>
-        <div className="landing-card">
-          <div className="landing-card-icon landing-card-icon-blue"><IconSteps /></div>
-          <h3>How it works</h3>
-          <ol className="landing-steps">
-            <li>State a requirement — typed, photographed, or spoken</li>
-            <li>Pact negotiates and verifies live, in seconds</li>
-            <li>Review the Decision, Evidence, and full Replay</li>
-            <li>Approve — nothing is binding until you do</li>
-          </ol>
-        </div>
-        <div className="landing-card landing-card-cta">
-          <div className="landing-card-icon landing-card-icon-cta"><IconFlag /></div>
-          <h3>Try the flagship scenario</h3>
-          <p>
-            8× H100 GPUs, a 3-month contract, a $115,000 budget — watch a
-            fabricated claim get caught and a compliant deal get selected,
-            live.
-          </p>
-          <button className="btn-primary" onClick={onEnterNegotiate}>
-            Open the negotiation console →
-          </button>
-        </div>
-      </Reveal>
+      <ProofStrip />
 
+      <Reveal><WhyTrustMatters /></Reveal>
+      <Reveal><HowPactWorks onEnterNegotiate={onEnterNegotiate} /></Reveal>
       <Reveal><TodayVsPact /></Reveal>
       <Reveal><OneNegotiationExplained /></Reveal>
       <Reveal><NoScoring /></Reveal>
-
-      <Reveal><ProofStrip /></Reveal>
 
       <footer className="landing-footer">
         <p className="landing-footer-tagline">

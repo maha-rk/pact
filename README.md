@@ -232,7 +232,7 @@ The flagship scenario is 8× H100 GPUs, a 3-month contract, and a $115,000 budge
 ## Evidence & Policy Gates
 
 > [!CAUTION]
-> **Policy overrides price.** A verified offer that violates budget, a blocked-vendor rule, or a required certification is rejected regardless of price (PRD §19) — see the row below.
+> **Policy overrides price.** A verified offer that violates budget, a blocked-vendor rule, a required certification, or an ESG/sustainability threshold is rejected regardless of price (PRD §19) — see the row below.
 
 **Claim verification**
 
@@ -256,11 +256,24 @@ The general rule these two rows illustrate — not just this one scenario:
 flowchart TD
     A["Vendor offer"] --> B{"Verified against<br/>real external data?"}
     B -- No --> C["Rejected — renegotiate"]
-    B -- Yes --> D{"Passes policy<br/>(budget, blocked vendor,<br/>certifications)?"}
+    B -- Yes --> D{"Passes policy<br/>(budget, blocked vendor,<br/>certifications, ESG)?"}
     D -- No --> E["Rejected — renegotiate"]
     D -- Yes --> F["Eligible for comparison"]
     F --> G["Human approval"]
 ```
+
+**ESG / sustainability policy gate**
+
+The Compliance Agent can also enforce a minimum renewable-energy threshold (`PolicyConstraints.min_renewable_energy_pct`), checked with the same hard-gate discipline as budget and certifications — a cheaper, non-compliant offer still loses. It's opt-in and defaults to unset, so it never changes the flagship scenario's behavior unless a caller asks for it.
+
+Each vendor's `renewable_energy_pct` is self-declared on its Agent Card, sourced from real, published sustainability disclosures — not independently re-verified per-region here, the same disclosure scope already applied to `certifications`:
+
+| Vendor | Declared renewable-energy match | Source |
+|---|---|---|
+| AWS | 100% | [Amazon matched 100% of global operations' electricity consumption with renewable energy, 2023, achieved 7 years early](https://www.aboutamazon.com/news/sustainability/amazon-renewable-energy-goal) |
+| Azure | 100% | [Microsoft matched 100% of annual global electricity consumption with renewable energy — 2025 Environmental Sustainability Report](https://blogs.microsoft.com/on-the-issues/2025/05/29/environmental-sustainability-report/) |
+
+Both real vendors clear any realistic threshold today, so this gate doesn't flip the flagship outcome — the point is that the gate is real and tested (`tests/unit/test_compliance_esg.py`), not that it currently produces a rejection. Try it: `min_renewable_energy_pct: 100.01` rejects both vendors on ESG grounds even though both already pass budget, verification, and certifications.
 
 Reproduce every figure above yourself with
 `python scripts/run_scenario.py --fixture flagship --approve` (see
@@ -620,6 +633,7 @@ would fail CI, not silently drift.
 | Real API Gateway (JWT auth + rate limiting, as `pact-core` middleware) | ✅ Implemented and tested — auth off by default, rate limiting always on |
 | Real OpenTelemetry tracing (console + BigQuery `model_traces`) | ✅ Implemented and tested |
 | Distributed negotiation execution (real Pub/Sub worker + standalone Compliance and Verification services + Firestore) | ✅ Implemented and tested — real, off by default (`PACT_DISTRIBUTED`) |
+| ESG / sustainability policy gate (`min_renewable_energy_pct`, checked against real published vendor sustainability data) | ✅ Implemented and tested — opt-in, off by default |
 | Application-level AES-256-GCM field encryption (budget, final price, reasoning, event detail) | ✅ Implemented and tested — real, off by default (`PACT_FIELD_ENCRYPTION_KEY`) |
 | Real observability dashboard (`GET /observability/summary`, frontend "Observability" view) | ✅ Implemented and tested — real SQL against `model_traces` + `negotiations` |
 | Verifiable SHA-256 evidence hash per negotiation (`GET /negotiations/{id}/evidence`) | ✅ Implemented and tested — independently recomputable, no `negotiation_id` in the bundle by design |
@@ -874,6 +888,16 @@ than it is — see `docs/PRD.md` §32 for the project's explicit non-claims.
 
 ## Roadmap
 
+- [ ] Contract redlining: extend the existing document-intake pipeline
+      (Gemini vision, already used for photo/quote parsing) to flag a
+      small, explicit set of disallowed contract clauses (e.g.
+      auto-renewal, uncapped liability) as a Compliance Agent check,
+      evidence-quoted the same way price and ESG checks are today — not
+      an open-ended "AI legal review" with no traceable source
+- [ ] Macro-shock renegotiation: event-triggered renegotiation when a
+      real external signal (e.g. a regional supply disruption) changes
+      vendor pricing, extending the same real-HTTP negotiation loop
+      that already exists, not a predictive/simulated one
 - [ ] GCP and RunPod vendor integrations, wired to their real pricing APIs
 - [ ] Gemini narration of individual negotiation moves in real time, not
       just the final Reasoning statement

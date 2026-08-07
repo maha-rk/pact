@@ -42,6 +42,13 @@ class AgentCard(BaseModel):
     endpoint: str
     capabilities: list[str]
     certifications: list[str] = Field(default_factory=list)
+    renewable_energy_pct: float | None = Field(
+        default=None,
+        description="Vendor's self-declared % of electricity consumption matched with "
+        "renewable energy, matching real published sustainability disclosures -- same "
+        "disclosure scope as `certifications` (not independently re-verified against a "
+        "live API in this build).",
+    )
 
 
 class Offer(BaseModel):
@@ -113,3 +120,8 @@ class PolicyConstraints(BaseModel):
     budget_ceiling_usd: float
     blocked_vendors: list[VendorId] = Field(default_factory=list)
     required_certifications: list[str] = Field(default_factory=list)
+    min_renewable_energy_pct: float | None = Field(
+        default=None,
+        description="If set, a vendor's declared renewable_energy_pct must meet or "
+        "exceed this to pass compliance -- opt-in, defaults to not enforced.",
+    )

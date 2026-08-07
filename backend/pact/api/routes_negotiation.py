@@ -54,9 +54,28 @@ VENDOR_ENDPOINTS = {
     VendorId.AWS: "http://localhost:9001",
     VendorId.AZURE: "http://localhost:9002",
 }
+# Mirrors each vendor's own self-declared AGENT_CARD (vendors/*/app.py) --
+# live A2A discovery (HttpVendorClient.get_agent_card) exists but isn't
+# wired into this hot path, so certifications/ESG data is duplicated here
+# rather than silently defaulting to empty and making required_certifications
+# / min_renewable_energy_pct policy checks unwinnable by construction.
 AGENT_CARDS = {
-    vid: AgentCard(vendor_id=vid, name=f"{vid.value.upper()} Vendor Agent", endpoint=ep, capabilities=["negotiate"])
-    for vid, ep in VENDOR_ENDPOINTS.items()
+    VendorId.AWS: AgentCard(
+        vendor_id=VendorId.AWS,
+        name="AWS Vendor Agent",
+        endpoint=VENDOR_ENDPOINTS[VendorId.AWS],
+        capabilities=["negotiate"],
+        certifications=["SOC2", "ISO27001"],
+        renewable_energy_pct=100.0,
+    ),
+    VendorId.AZURE: AgentCard(
+        vendor_id=VendorId.AZURE,
+        name="Azure Vendor Agent",
+        endpoint=VENDOR_ENDPOINTS[VendorId.AZURE],
+        capabilities=["negotiate"],
+        certifications=["SOC2", "ISO27001"],
+        renewable_energy_pct=100.0,
+    ),
 }
 
 
@@ -69,6 +88,7 @@ class NegotiationRequest(BaseModel):
     raw_input: str
     blocked_vendors: list[VendorId] = []
     required_certifications: list[str] = []
+    min_renewable_energy_pct: float | None = None
     initial_claimed_discounts: dict[VendorId, float]
 
 
@@ -142,6 +162,7 @@ def create_negotiation(request: Request, req: NegotiationRequest, background_tas
         budget_ceiling_usd=req.budget_ceiling_usd,
         blocked_vendors=req.blocked_vendors,
         required_certifications=req.required_certifications,
+        min_renewable_energy_pct=req.min_renewable_energy_pct,
     )
     candidate_vendors = list(req.initial_claimed_discounts.keys())
     store = _store()
@@ -163,6 +184,7 @@ def create_negotiation(request: Request, req: NegotiationRequest, background_tas
                 "raw_input": req.raw_input,
                 "blocked_vendors": [v.value for v in req.blocked_vendors],
                 "required_certifications": req.required_certifications,
+                "min_renewable_energy_pct": req.min_renewable_energy_pct,
                 "initial_claimed_discounts": {v.value: rate for v, rate in req.initial_claimed_discounts.items()},
             },
         )

@@ -22,6 +22,12 @@ AGENT_CARD = AgentCard(
     # documentation -- unlike pricing claims, certifications aren't
     # independently re-verified against a live API in this build's scope.
     certifications=["SOC2", "ISO27001"],
+    # Amazon matched 100% of global operations' electricity consumption
+    # with renewable energy in 2023 (achieved 7 years early), continued in
+    # 2024 -- https://www.aboutamazon.com/news/sustainability/amazon-renewable-energy-goal.
+    # Same disclosure scope as certifications: a real, published company-
+    # wide figure, not independently re-verified per-region here.
+    renewable_energy_pct=100.0,
 )
 
 

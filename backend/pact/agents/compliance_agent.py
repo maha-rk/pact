@@ -9,7 +9,10 @@ from pact.models.schemas import ComplianceResult, Offer, PolicyConstraints
 
 
 def check_compliance(
-    offer: Offer, policy: PolicyConstraints, vendor_certifications: list[str] | None = None
+    offer: Offer,
+    policy: PolicyConstraints,
+    vendor_certifications: list[str] | None = None,
+    vendor_renewable_energy_pct: float | None = None,
 ) -> ComplianceResult:
     if offer.vendor_id in policy.blocked_vendors:
         return ComplianceResult(
@@ -38,9 +41,22 @@ def check_compliance(
                 passed=False,
                 detail=f"{offer.vendor_id.value} is missing required certification(s): {', '.join(missing)}",
             )
+    if policy.min_renewable_energy_pct is not None:
+        declared = vendor_renewable_energy_pct
+        if declared is None or declared < policy.min_renewable_energy_pct:
+            declared_label = "an undisclosed" if declared is None else f"a declared {declared:.1f}%"
+            return ComplianceResult(
+                vendor_id=offer.vendor_id,
+                constraint_name="esg_renewable_energy",
+                passed=False,
+                detail=(
+                    f"{offer.vendor_id.value} has {declared_label} renewable-energy match, "
+                    f"below the required {policy.min_renewable_energy_pct:.1f}% ESG threshold"
+                ),
+            )
     return ComplianceResult(
         vendor_id=offer.vendor_id,
         constraint_name="all_constraints",
         passed=True,
-        detail="Deal satisfies the budget ceiling, vendor block-list, and certification constraints",
+        detail="Deal satisfies the budget ceiling, vendor block-list, certification, and ESG constraints",
     )

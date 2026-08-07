@@ -23,8 +23,8 @@ describe("App", () => {
   it("shows the landing page first, not the negotiation form", () => {
     render(<App />);
 
-    expect(screen.getByText("Which vendor's claimed discount is real?")).toBeInTheDocument();
-    expect(screen.queryByText("Requirement")).not.toBeInTheDocument();
+    expect(screen.getByText("Autonomous procurement for the agent economy.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Requirement", level: 2 })).not.toBeInTheDocument();
   });
 
   it("enters the negotiate view from the landing page's primary CTA", async () => {
@@ -44,7 +44,7 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "See live results" }));
+    await user.click(screen.getByRole("button", { name: "See live results →" }));
 
     expect(await screen.findByText(/nothing real to/)).toBeInTheDocument();
   });
@@ -58,7 +58,7 @@ describe("App", () => {
     expect(brandButton).not.toBeNull();
     await user.click(brandButton as HTMLElement);
 
-    expect(screen.getByText("Which vendor's claimed discount is real?")).toBeInTheDocument();
+    expect(screen.getByText("Autonomous procurement for the agent economy.")).toBeInTheDocument();
   });
 
   it("runs a negotiation and renders the resulting decision tab", async () => {

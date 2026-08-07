@@ -23,6 +23,12 @@ AGENT_CARD = AgentCard(
     # documentation -- unlike pricing claims, certifications aren't
     # independently re-verified against a live API in this build's scope.
     certifications=["SOC2", "ISO27001"],
+    # Microsoft matched 100% of its annual global electricity consumption
+    # with renewable energy (2025 Environmental Sustainability Report) --
+    # https://blogs.microsoft.com/on-the-issues/2025/05/29/environmental-sustainability-report/.
+    # Same disclosure scope as certifications: a real, published company-
+    # wide figure, not independently re-verified per-region here.
+    renewable_energy_pct=100.0,
 )
 
 

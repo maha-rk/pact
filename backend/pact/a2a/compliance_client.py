@@ -25,13 +25,18 @@ class HttpComplianceClient:
         self._timeout = timeout
 
     def check_compliance(
-        self, offer: Offer, policy: PolicyConstraints, vendor_certifications: list[str] | None = None
+        self,
+        offer: Offer,
+        policy: PolicyConstraints,
+        vendor_certifications: list[str] | None = None,
+        vendor_renewable_energy_pct: float | None = None,
     ) -> ComplianceResult:
         url = f"{self._endpoint}/check-compliance"
         body = {
             "offer": offer.model_dump(mode="json"),
             "policy": policy.model_dump(mode="json"),
             "vendor_certifications": vendor_certifications or [],
+            "vendor_renewable_energy_pct": vendor_renewable_energy_pct,
         }
         try:
             resp = httpx.post(url, json=body, timeout=self._timeout)
