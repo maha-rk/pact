@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/screenshots/hero.png" alt="Pact — Decision / Evidence / Reasoning view showing Azure selected at $39,246.20 with cited evidence" width="100%" />
+  <img src="docs/screenshots/hero.png" alt="Pact — landing page hero showing the live negotiation walkthrough: AWS's claimed discount rejected, Azure verified and selected at $39,246.20" width="100%" />
 </p>
 
 <h1 align="center">Pact</h1>
