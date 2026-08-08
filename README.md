@@ -1040,6 +1040,33 @@ price, BATNA, time-decay) rather than a model's free-form generation.
 Gemini is used elsewhere — narrating the final decision, extracting
 requirement fields from a photo or transcript — but never to set a
 price, a verification verdict, or a compliance verdict.
+
+The formula itself, straight from
+[`pact/negotiation/concession.py`](backend/pact/negotiation/concession.py):
+
+<table><tr><td>
+
+**`t`** = how far through the rounds you are = `(round − 1) / (total_rounds − 1)`
+
+**`fraction_conceded`** = `t ^ β`
+
+**`offer`** = `opening − (opening − reservation) × fraction_conceded`
+
+</td></tr></table>
+
+- `opening` — the first, most favorable-to-this-party offer.
+- `reservation` — the walk-away point (BATNA-derived); a party's offer
+  never crosses it, in either direction.
+- `β` (beta) — concession shape. `β = 1` is linear; `β > 1` ("Boulware")
+  concedes slowly at first and quickly near the deadline — the default
+  Pact uses; `β < 1` concedes quickly at first, then slowly.
+
+For the buyer specifically, `reservation` is never invented — it's
+`min(budget_ceiling, market_floor)`, where `market_floor` comes from the
+same live pricing API used to verify vendor claims. Two pure functions,
+no hidden state, no model in the loop: `offer_at_round()` for a single
+round, `generate_offer_sequence()` for the full deterministic sequence —
+covered by `tests/unit/test_concession.py`.
 </details>
 
 <details>
