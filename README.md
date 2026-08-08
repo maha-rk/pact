@@ -14,7 +14,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" />
   <img alt="Node" src="https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white" />
   <img alt="CI" src="https://github.com/maha-rk/pact/actions/workflows/ci.yml/badge.svg" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-79%20(73%20passed%2C%206%20skipped)-brightgreen" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-79-brightgreen" />
   <img alt="Fabricated numbers" src="https://img.shields.io/badge/Fabricated%20Numbers-Zero-7C3AED" />
   <img alt="Approval" src="https://img.shields.io/badge/Finalization-Human%20Approval%20Required-F59E0B" />
   <img alt="Transaction" src="https://img.shields.io/badge/External%20Transaction-Disabled%20by%20Design-0284C7" />
